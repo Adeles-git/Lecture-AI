@@ -26,9 +26,17 @@ import time
 import subprocess
 import tempfile
 import posixpath
+import ssl
 from collections import OrderedDict
-from urllib.parse import urlparse, unquote
+from urllib.parse import urlparse, unquote, urlencode
+from urllib.request import Request, urlopen
 from xml.etree import ElementTree as ET
+
+try:
+    import certifi
+    SSL_CONTEXT = ssl.create_default_context(cafile=certifi.where())
+except Exception:
+    SSL_CONTEXT = ssl.create_default_context()
 from email.parser import BytesParser
 from email.policy import default as email_policy
 
@@ -42,6 +50,144 @@ TTS_CACHE = OrderedDict()
 TTS_CACHE_MAX = 256
 TTS_INFLIGHT = {}
 TTS_SEMAPHORE = threading.Semaphore(3)
+
+TRANSLATE_CACHE_LOCK = threading.Lock()
+TRANSLATE_CACHE = OrderedDict()
+TRANSLATE_CACHE_MAX = 512
+
+
+def _google_translate_raw(text, target_lang, source_lang="auto"):
+    tl = "kk" if str(target_lang).lower().startswith("kk") else ("en" if str(target_lang).lower().startswith("en") else "ru")
+    sl = "auto" if not source_lang or source_lang == "auto" else ("kk" if str(source_lang).lower().startswith("kk") else ("en" if str(source_lang).lower().startswith("en") else "ru"))
+
+    # 1. Основной быстрый канал: clients5.google.com/translate_a/t
+    try:
+        qs = urlencode({"client": "dict-chrome-ex", "sl": sl, "tl": tl, "q": text})
+        url = f"https://clients5.google.com/translate_a/t?{qs}"
+        req = Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urlopen(req, timeout=8, context=SSL_CONTEXT) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        if isinstance(data, list) and data:
+            first = data[0]
+            if isinstance(first, str) and first.strip():
+                return first.strip()
+            if isinstance(first, list) and first and isinstance(first[0], str):
+                return first[0].strip()
+    except Exception:
+        pass
+
+    # 2. Резервный канал: translate.googleapis.com
+    try:
+        qs = urlencode({"client": "gtx", "sl": sl, "tl": tl, "dt": "t", "q": text})
+        url = f"https://translate.googleapis.com/translate_a/single?{qs}"
+        req = Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urlopen(req, timeout=8, context=SSL_CONTEXT) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        if isinstance(data, list) and data and isinstance(data[0], list):
+            joined = "".join(part[0] for part in data[0] if isinstance(part, list) and part and isinstance(part[0], str)).strip()
+            if joined:
+                return joined
+    except Exception:
+        pass
+
+    # 3. Запасной канал: MyMemory (для коротких фраз до 450 симв.)
+    if len(text) <= 450:
+        pair_sl = "ru" if sl == "auto" else sl
+        qs = urlencode({"q": text, "langpair": f"{pair_sl}|{tl}"})
+        url = f"https://api.mymemory.translated.net/get?{qs}"
+        req = Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urlopen(req, timeout=8, context=SSL_CONTEXT) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        tr = (data.get("responseData") or {}).get("translatedText")
+        if isinstance(tr, str) and tr.strip():
+            return tr.strip()
+
+    raise RuntimeError("All translation providers failed")
+
+
+def translate_texts_cached(texts, target_lang="ru", source_lang="auto"):
+    if not isinstance(texts, list) or not texts:
+        return [], False
+    tl = str(target_lang or "ru").lower()[:2]
+    sl = str(source_lang or "auto").lower()
+    out = [str(t or "") for t in texts]
+    missing_indices = []
+
+    with TRANSLATE_CACHE_LOCK:
+        for idx, raw in enumerate(out):
+            s = raw.strip()
+            if not s or len(s) < 2:
+                continue
+            ck = (sl, tl, s)
+            cached = TRANSLATE_CACHE.get(ck)
+            if cached is not None:
+                TRANSLATE_CACHE.move_to_end(ck)
+                out[idx] = cached
+            else:
+                missing_indices.append(idx)
+
+    if not missing_indices:
+        return out, False
+
+    sep = "\n###LAI_SEP###\n"
+    sep_re = re.compile(r"\s*#+\s*LAI_SEP\s*#+\s*", re.IGNORECASE)
+    used_fallback = False
+
+    chunks = []
+    cur_chunk = []
+    cur_len = 0
+    for idx in missing_indices:
+        s = out[idx].strip()
+        add_len = len(s) + len(sep)
+        if cur_chunk and cur_len + add_len > 1800:
+            chunks.append(cur_chunk)
+            cur_chunk = [idx]
+            cur_len = len(s)
+        else:
+            cur_chunk.append(idx)
+            cur_len += add_len
+    if cur_chunk:
+        chunks.append(cur_chunk)
+
+    for chunk in chunks:
+        joined = sep.join(out[i].strip() for i in chunk)
+        translated_parts = None
+        ok_flags = None
+        try:
+            joined_tr = _google_translate_raw(joined, tl, sl)
+            parts = sep_re.split(joined_tr)
+            if len(parts) == len(chunk):
+                translated_parts = [p.strip() for p in parts]
+                ok_flags = [True] * len(chunk)
+        except Exception:
+            pass
+
+        if translated_parts is None:
+            translated_parts = []
+            ok_flags = []
+            for i in chunk:
+                try:
+                    translated_parts.append(_google_translate_raw(out[i].strip(), tl, sl))
+                    ok_flags.append(True)
+                except Exception:
+                    used_fallback = True
+                    translated_parts.append(out[i])
+                    ok_flags.append(False)
+
+        with TRANSLATE_CACHE_LOCK:
+            for i, tr, ok in zip(chunk, translated_parts, ok_flags):
+                orig_s = out[i].strip()
+                final_tr = tr or orig_s
+                out[i] = final_tr
+                # Кэшируем ТОЛЬКО реально переведённые строки (никогда не кэшируем ошибку!)
+                if ok and final_tr:
+                    ck = (sl, tl, orig_s)
+                    TRANSLATE_CACHE[ck] = final_tr
+                    TRANSLATE_CACHE.move_to_end(ck)
+                    while len(TRANSLATE_CACHE) > TRANSLATE_CACHE_MAX:
+                        TRANSLATE_CACHE.popitem(last=False)
+
+    return out, used_fallback
 
 
 def clean_tts_text(raw_text, lang="ru"):
@@ -346,31 +492,171 @@ def extract_text_from_pptx_bytes(data_bytes):
     return "\n\n".join(slides_text).strip()
 
 
+def extract_text_from_rtf_bytes(data_bytes):
+    raw = data_bytes.decode("latin-1", errors="ignore")
+    # Декодируем кириллицу Windows-1251 (\'xx) и Unicode (\uNNNN?)
+    def repl_hex(m):
+        try:
+            return bytes.fromhex(m.group(1)).decode("cp1251")
+        except Exception:
+            return ""
+
+    def repl_uni(m):
+        try:
+            code = int(m.group(1))
+            if code < 0:
+                code += 65536
+            return chr(code)
+        except Exception:
+            return ""
+
+    txt = re.sub(r"\\'[0-9a-fA-F]{2}", repl_hex, raw)
+    txt = re.sub(r"\\u(-?\d+)\??", repl_uni, txt)
+    txt = re.sub(r"\\(?:par|line)\b", "\n", txt)
+    txt = re.sub(r"\\[a-zA-Z]+-?\d*\s?", " ", txt)
+    txt = txt.replace("{", " ").replace("}", " ")
+    lines = [re.sub(r"\s+", " ", ln).strip() for ln in txt.splitlines()]
+    return "\n".join([ln for ln in lines if len(ln) > 1]).strip()
+
+
+def _decode_pdf_hex_token(hex_bytes, bfchar_map):
+    h = re.sub(rb"\s+", b"", hex_bytes).upper()
+    if not h:
+        return ""
+    if bfchar_map:
+        out = []
+        step = 4 if len(h) % 4 == 0 else 2
+        for i in range(0, len(h), step):
+            code = h[i:i + step].decode("ascii", errors="ignore")
+            if code in bfchar_map:
+                out.append(bfchar_map[code])
+            elif step == 4:
+                try:
+                    out.append(bytes.fromhex(code).decode("utf-16-be", errors="ignore"))
+                except Exception:
+                    pass
+        if out:
+            return "".join(out)
+    try:
+        raw_b = bytes.fromhex(h.decode("ascii", errors="ignore"))
+        if raw_b.startswith(b"\xfe\xff") or (len(raw_b) >= 4 and len(raw_b) % 2 == 0 and raw_b[0] in (0x00, 0x04)):
+            return raw_b.decode("utf-16-be", errors="ignore")
+        return raw_b.decode("cp1251", errors="ignore")
+    except Exception:
+        return ""
+
+
+def _decode_pdf_literal_token(lit_bytes):
+    # Обработка восьмеричных escape-кодов \ddd и стандартных экранирований PDF
+    def oct_repl(m):
+        try:
+            return bytes([int(m.group(1), 8)])
+        except Exception:
+            return b""
+
+    b = re.sub(rb"\\([0-7]{1,3})", oct_repl, lit_bytes)
+    b = (
+        b.replace(rb"\n", b"\n")
+        .replace(rb"\r", b" ")
+        .replace(rb"\t", b" ")
+        .replace(rb"\(", b"(")
+        .replace(rb"\)", b")")
+        .replace(rb"\\", b"\\")
+    )
+    if b.startswith(b"\xfe\xff"):
+        return b[2:].decode("utf-16-be", errors="ignore")
+    try:
+        return b.decode("utf-8")
+    except UnicodeDecodeError:
+        return b.decode("cp1251", errors="ignore")
+
+
 def extract_text_from_pdf_bytes(data_bytes):
-    chunks = []
-    for m in re.finditer(rb"stream[ \t]*\r?\n?(.*?)\r?\n?endstream", data_bytes, re.DOTALL):
+    # 1. Пробуем профессиональные библиотеки (pypdf / PyPDF2 / pymupdf), если установлены в окружении
+    for mod_name in ("pypdf", "PyPDF2"):
+        try:
+            pdf_mod = __import__(mod_name)
+            reader = pdf_mod.PdfReader(io.BytesIO(data_bytes))
+            pages_txt = []
+            for idx, page in enumerate(reader.pages[:45], 1):
+                pt = (page.extract_text() or "").strip()
+                if pt:
+                    pages_txt.append(f"[Слайд {idx}]\n{pt}")
+            joined_lib = "\n\n".join(pages_txt).strip()
+            if len(joined_lib) > 40:
+                return joined_lib[:24000]
+        except Exception:
+            pass
+
+    # 2. Улучшенный встроенный парсер потоков PDF с поддержкой ToUnicode CMap, UTF-16BE и CP1251
+    streams = []
+    for m in re.finditer(rb"(?<!end)stream[ \t]*\r?\n(.*?)\r?\n?endstream", data_bytes, re.DOTALL):
         raw_stream = m.group(1)
         decompressed = None
-        for wbits in (zlib.MAX_WBITS, -zlib.MAX_WBITS):
+        for wbits in (zlib.MAX_WBITS, -zlib.MAX_WBITS, zlib.MAX_WBITS | 32):
             try:
                 decompressed = zlib.decompress(raw_stream, wbits)
                 break
             except Exception:
                 pass
-        target = decompressed if decompressed else raw_stream
-        for tm in re.finditer(rb"\(((?:\\.|[^()\\]){2,300})\)\s*Tj|\[(.*?)\]\s*TJ", target, re.DOTALL):
-            if tm.group(1):
-                seg = tm.group(1)
+        streams.append(decompressed if decompressed else raw_stream)
+
+    bfchar_map = {}
+    for st in streams:
+        if b"beginbfchar" in st:
+            for block in re.finditer(rb"beginbfchar(.*?)endbfchar", st, re.DOTALL):
+                for cm in re.finditer(rb"<([0-9A-Fa-f]{2,4})>[ \t]*<([0-9A-Fa-f]{4,8})>", block.group(1)):
+                    src_k = cm.group(1).decode("ascii", errors="ignore").upper()
+                    dst_h = cm.group(2).decode("ascii", errors="ignore")
+                    try:
+                        bfchar_map[src_k] = bytes.fromhex(dst_h).decode("utf-16-be", errors="ignore")
+                    except Exception:
+                        pass
+        if b"beginbfrange" in st:
+            for block in re.finditer(rb"beginbfrange(.*?)endbfrange", st, re.DOTALL):
+                for rm in re.finditer(rb"<([0-9A-Fa-f]{2,4})>[ \t]*<([0-9A-Fa-f]{2,4})>[ \t]*<([0-9A-Fa-f]{4})>", block.group(1)):
+                    try:
+                        start_c = int(rm.group(1), 16)
+                        end_c = int(rm.group(2), 16)
+                        target_u = int(rm.group(3), 16)
+                        width = len(rm.group(1))
+                        for offset in range(min(256, max(0, end_c - start_c + 1))):
+                            key_hex = f"{start_c + offset:0{width}X}"
+                            bfchar_map[key_hex] = chr(target_u + offset)
+                    except Exception:
+                        pass
+
+    chunks = []
+    token_re = re.compile(
+        rb"\(((?:\\.|[^()\\]){1,400})\)\s*Tj|<([0-9A-Fa-f\s]{2,800})>\s*Tj|\[(.*?)\]\s*TJ",
+        re.DOTALL,
+    )
+    inner_re = re.compile(rb"\(((?:\\.|[^()\\])+)\)|<([0-9A-Fa-f\s]+)>")
+
+    for target in streams:
+        if b"beginbfchar" in target and b"BT" not in target:
+            continue
+        for tm in token_re.finditer(target):
+            if tm.group(1) is not None:
+                txt = _decode_pdf_literal_token(tm.group(1))
+            elif tm.group(2) is not None:
+                txt = _decode_pdf_hex_token(tm.group(2), bfchar_map)
             else:
-                inner = re.findall(rb"\(((?:\\.|[^()\\])+)\)", tm.group(2) or b"")
-                seg = b"".join(inner)
-            txt = seg.replace(rb"\(", b"(").replace(rb"\)", b")").replace(rb"\\", b"\\").decode("utf-8", errors="ignore")
-            clean = re.sub(r"[^А-Яа-яЁёӘәІіҢңҒғҮүҰұҚқӨөҺһA-Za-z0-9.,:;!?()/%+-]+", " ", txt).strip()
-            if len(clean) >= 3:
+                parts_txt = []
+                for im in inner_re.finditer(tm.group(3) or b""):
+                    if im.group(1) is not None:
+                        parts_txt.append(_decode_pdf_literal_token(im.group(1)))
+                    elif im.group(2) is not None:
+                        parts_txt.append(_decode_pdf_hex_token(im.group(2), bfchar_map))
+                txt = "".join(parts_txt)
+            clean = re.sub(r"[^А-Яа-яЁёӘәІіҢңҒғҮүҰұҚқӨөҺһA-Za-z0-9.,:;!?()/%+=«»\"'–—\s-]+", " ", txt)
+            clean = re.sub(r"\s+", " ", clean).strip()
+            if len(clean) >= 2:
                 chunks.append(clean)
+
     joined = " ".join(chunks).strip()
-    if len(joined) > 60:
-        return joined[:12000]
+    if len(joined) > 45:
+        return joined[:20000]
     return ""
 
 
@@ -518,21 +804,45 @@ class LectureAIHandler(http.server.SimpleHTTPRequestHandler):
                     continue
                 text = ""
                 try:
-                    if data.startswith(b"\xd0\xcf\x11\xe0") or fn.endswith(".doc") or fn.endswith(".rtf"):
-                        ext = ".rtf" if fn.endswith(".rtf") else ".doc"
+                    if data.startswith(b"{\\rtf") or fn.endswith(".rtf"):
+                        if os.path.exists("/usr/bin/textutil"):
+                            tmp_path = None
+                            try:
+                                with tempfile.NamedTemporaryFile(suffix=".rtf", delete=False) as tf:
+                                    tf.write(data)
+                                    tmp_path = tf.name
+                                proc = subprocess.run(
+                                    ["/usr/bin/textutil", "-convert", "txt", "-stdout", tmp_path],
+                                    capture_output=True,
+                                    timeout=12
+                                )
+                                if proc.returncode == 0 and proc.stdout:
+                                    text = proc.stdout.decode("utf-8", errors="ignore").strip()
+                            except Exception:
+                                pass
+                            finally:
+                                if tmp_path and os.path.exists(tmp_path):
+                                    try:
+                                        os.remove(tmp_path)
+                                    except Exception:
+                                        pass
+                        if not text:
+                            text = extract_text_from_rtf_bytes(data)
+                    elif data.startswith(b"\xd0\xcf\x11\xe0") or fn.endswith(".doc"):
                         tmp_path = None
                         try:
-                            with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tf:
-                                tf.write(data)
-                                tmp_path = tf.name
-                            proc = subprocess.run(
-                                ["/usr/bin/textutil", "-convert", "txt", "-stdout", tmp_path],
-                                capture_output=True,
-                                timeout=12
-                            )
-                            if proc.returncode == 0 and proc.stdout:
-                                text = proc.stdout.decode("utf-8", errors="ignore").strip()
-                            else:
+                            if os.path.exists("/usr/bin/textutil"):
+                                with tempfile.NamedTemporaryFile(suffix=".doc", delete=False) as tf:
+                                    tf.write(data)
+                                    tmp_path = tf.name
+                                proc = subprocess.run(
+                                    ["/usr/bin/textutil", "-convert", "txt", "-stdout", tmp_path],
+                                    capture_output=True,
+                                    timeout=12
+                                )
+                                if proc.returncode == 0 and proc.stdout:
+                                    text = proc.stdout.decode("utf-8", errors="ignore").strip()
+                            if not text:
                                 warnings.append(f"Не удалось прочитать старый формат «{p['filename']}» — попробуйте пересохранить в .docx.")
                         except Exception as doc_err:
                             warnings.append(f"Ошибка чтения .doc «{p['filename']}»: {doc_err}")
@@ -574,12 +884,16 @@ class LectureAIHandler(http.server.SimpleHTTPRequestHandler):
         if path == "/api/lectures":
             try:
                 data = json.loads(body.decode("utf-8"))
-                lec_id = data.get("id") or ("lec_" + datetime.datetime.now().strftime("%H%M%S"))
-                c_hash = data.get("contentHash", "")
-                c_title = data.get("courseTitle", "Вузовская лекция")
-                dom_id = data.get("domainId", "universal")
-                t_cnt = len(data.get("glossary", []))
-                s_cnt = len(data.get("scenes", []))
+                if not isinstance(data, dict):
+                    return self.send_json(400, {"error": "Payload must be a JSON object"})
+                lec_id = str(data.get("id") or ("lec_" + datetime.datetime.now().strftime("%H%M%S")))[:80]
+                c_hash = str(data.get("contentHash") or "")[:80]
+                c_title = str(data.get("courseTitle") or "Вузовская лекция")[:240]
+                dom_id = str(data.get("domainId") or "universal")[:40]
+                glossary_list = data.get("glossary") if isinstance(data.get("glossary"), list) else []
+                scenes_list = data.get("scenes") if isinstance(data.get("scenes"), list) else []
+                t_cnt = len(glossary_list)
+                s_cnt = len(scenes_list)
                 now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
                 with DB_LOCK:
                     conn = sqlite3.connect(DB_PATH)
@@ -598,7 +912,10 @@ class LectureAIHandler(http.server.SimpleHTTPRequestHandler):
         if path == "/api/feedback":
             try:
                 data = json.loads(body.decode("utf-8"))
+                if not isinstance(data, dict):
+                    return self.send_json(400, {"error": "Payload must be a JSON object"})
                 now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+                clamp_score = lambda val, lo, hi, dflt: max(lo, min(hi, int(val if val is not None else dflt)))
                 with DB_LOCK:
                     conn = sqlite3.connect(DB_PATH)
                     cur = conn.cursor()
@@ -606,15 +923,15 @@ class LectureAIHandler(http.server.SimpleHTTPRequestHandler):
                         INSERT INTO feedback (tester_name, university, user_group, clarity_score, terms_score, animation_score, nps_score, comment, course_title, created_at)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """, (
-                        data.get("testerName", "Студент"),
-                        data.get("university", "Вуз РК"),
-                        data.get("userGroup", "Студент"),
-                        int(data.get("clarityScore", 5)),
-                        int(data.get("termsScore", 5)),
-                        int(data.get("animationScore", 5)),
-                        int(data.get("npsScore", 10)),
-                        data.get("comment", ""),
-                        data.get("courseTitle", "Lecture AI"),
+                        str(data.get("testerName") or "Студент")[:120],
+                        str(data.get("university") or "Вуз РК")[:120],
+                        str(data.get("userGroup") or "Студент")[:120],
+                        clamp_score(data.get("clarityScore"), 1, 5, 5),
+                        clamp_score(data.get("termsScore"), 1, 5, 5),
+                        clamp_score(data.get("animationScore"), 1, 5, 5),
+                        clamp_score(data.get("npsScore"), 0, 10, 10),
+                        str(data.get("comment") or "")[:1000],
+                        str(data.get("courseTitle") or "Lecture AI")[:240],
                         now_str
                     ))
                     conn.commit()
@@ -623,6 +940,19 @@ class LectureAIHandler(http.server.SimpleHTTPRequestHandler):
             except Exception as e:
                 self.send_json(400, {"error": str(e)})
             return
+
+        if parsed.path == "/api/translate":
+            try:
+                payload = json.loads(body.decode("utf-8")) if body else {}
+            except Exception:
+                return self.send_json(400, {"error": "Invalid JSON"})
+            texts = payload.get("texts")
+            target_lang = str(payload.get("targetLang") or "ru")
+            source_lang = str(payload.get("sourceLang") or "auto")
+            if not isinstance(texts, list):
+                return self.send_json(400, {"error": "texts must be an array"})
+            translations, used_fallback = translate_texts_cached(texts[:180], target_lang, source_lang)
+            return self.send_json(200, {"translations": translations, "fallback": used_fallback})
 
         if parsed.path == "/api/tts":
             if edge_tts is None:
@@ -635,6 +965,7 @@ class LectureAIHandler(http.server.SimpleHTTPRequestHandler):
             raw_text = payload.get("text")
             raw_lang = payload.get("lang")
             emotion = payload.get("emotion", "explain")
+            voice_gender = str(payload.get("voiceGender") or "female").lower()
             rate = payload.get("rate", "")
             pitch = payload.get("pitch", "")
             volume = payload.get("volume", "")
@@ -648,12 +979,13 @@ class LectureAIHandler(http.server.SimpleHTTPRequestHandler):
             if not text or not re.search(r"[0-9A-Za-zА-Яа-яЁёӘәІіҢңҒғҮүҰұҚқӨөҺһ]", text):
                 return self.send_json(400, {"error": "Empty or non-speakable text"})
 
+            is_male = voice_gender == "male"
             if lang.startswith("kk"):
-                voice = "kk-KZ-AigulNeural"
+                voice = "kk-KZ-DauletNeural" if is_male else "kk-KZ-AigulNeural"
             elif lang.startswith("en"):
-                voice = "en-US-AvaNeural"
+                voice = "en-US-AndrewNeural" if is_male else "en-US-AvaNeural"
             else:
-                voice = "ru-RU-SvetlanaNeural"
+                voice = "ru-RU-DmitryNeural" if is_male else "ru-RU-SvetlanaNeural"
 
             r_val, p_val, v_val = resolve_tts_prosody(emotion, rate, pitch, volume, lang)
 

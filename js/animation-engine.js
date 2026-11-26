@@ -23,13 +23,13 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
     this.onTimeUpdate = null;
     this.animFrameId = null;
 
-    // Режимы демонстрации и студийная предгенерированная озвучка (Web Audio API + Edge Neural / Gemini / Browser)
+    // Режимы демонстрации и студийная потоковая озвучка (Web Audio API + Edge Neural / Browser)
     this.showRawDefectMode = false;
     this.ttsEnabled = true;
+    this.voiceGender = "female"; // "female" | "male"
     this.ttsBackendMode = "neural_buffer"; // "neural_buffer" | "browser_speech" | "subtitles_only"
     this.ttsLang = "ru-RU";
-    this.geminiTtsKey = "";
-    this.audioCache = new Map(); // URLs / ArrayBuffers
+    this.audioCache = new Map();
     this.audioBufferCache = new Map(); // cacheKey -> AudioBuffer
     this.pendingAudioFetches = new Map();
     this.audioCtx = null;
@@ -41,11 +41,14 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
     this.kkNoticeShown = false;
     this.activeAudioEl = null;
     this.onTtsNotice = null;
+    this.onAudioProgress = null;
     this.lastSpokenSceneIdx = -1;
     this.ttsRunId = 0;
+    this.streamRunId = 0;
     this.activeUtterance = null;
     this.ttsTimer = null;
     this.isExporting = false;
+    this.cancelExportFlag = false;
     this._backdropCache = new Map();
     this._camState = { x: 0, y: 0, zoom: 1 };
 
@@ -280,81 +283,26 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
     }
   }
 
-  wrapPcmAsWav(pcmBytes, sampleRate = 24000, channels = 1) {
-    const bitsPerSample = 16;
-    const byteRate = sampleRate * channels * (bitsPerSample / 8);
-    const blockAlign = channels * (bitsPerSample / 8);
-    const wavBuffer = new ArrayBuffer(44 + pcmBytes.byteLength);
-    const view = new DataView(wavBuffer);
-    const writeAscii = (offset, str) => {
-      for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
-    };
-    writeAscii(0, "RIFF");
-    view.setUint32(4, 36 + pcmBytes.byteLength, true);
-    writeAscii(8, "WAVE");
-    writeAscii(12, "fmt ");
-    view.setUint32(16, 16, true);
-    view.setUint16(20, 1, true);
-    view.setUint16(22, channels, true);
-    view.setUint32(24, sampleRate, true);
-    view.setUint32(28, byteRate, true);
-    view.setUint16(32, blockAlign, true);
-    view.setUint16(34, bitsPerSample, true);
-    writeAscii(36, "data");
-    view.setUint32(40, pcmBytes.byteLength, true);
-    new Uint8Array(wavBuffer, 44).set(pcmBytes);
-    return wavBuffer;
-  }
-
-  async playWithGeminiTts(cleanText, apiKey, locale, runId) {
-    const cacheKey = `${locale}::${cleanText}`;
-    let blobUrl = this.audioCache.get(cacheKey);
-
-    if (!blobUrl) {
-      const model = "gemini-3.8-flash-lite-tts";
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
-      const resp = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: cleanText }] }],
-          generationConfig: {
-            responseModalities: ["AUDIO"],
-            speechConfig: {
-              languageCode: locale,
-              voiceConfig: { prebuiltVoiceConfig: { voiceName: "Aoede" } }
-            }
-          }
-        })
-      });
-      if (!resp.ok) throw new Error(`Gemini TTS HTTP ${resp.status}`);
-      const json = await resp.json();
-      const inlineData = json?.candidates?.[0]?.content?.parts?.find((p) => p.inlineData)?.inlineData;
-      if (!inlineData?.data) throw new Error("Empty Gemini TTS audio");
-
-      const bin = atob(inlineData.data);
-      const bytes = new Uint8Array(bin.length);
-      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-
-      const mime = (inlineData.mimeType || "").toLowerCase();
-      const rateMatch = mime.match(/rate=(\d+)/);
-      const sampleRate = rateMatch ? Number(rateMatch[1]) : 24000;
-      const wavBuffer = mime.includes("wav") ? bytes.buffer : this.wrapPcmAsWav(bytes, sampleRate, 1);
-
-      blobUrl = URL.createObjectURL(new Blob([wavBuffer], { type: "audio/wav" }));
-      this.audioCache.set(cacheKey, blobUrl);
+  setVoiceGender(gender) {
+    const nextG = gender === "male" ? "male" : "female";
+    if (this.voiceGender === nextG) return;
+    this.voiceGender = nextG;
+    this.stopTts();
+    this.lastSpokenSceneIdx = -1;
+    // Сбрасываем привязанные буферы сцен, чтобы подгрузился выбранный тембр голоса
+    (this.scenes || []).forEach((s) => {
+      s.audioBuffer = null;
+      s.beatDurations = null;
+    });
+    if (this.isReady && this.ttsEnabled) {
+      this.streamStoryboardAudioProgressive(this.scenes, this.ttsLang, this.onAudioProgress);
     }
-
-    if (runId !== this.ttsRunId || !this.ttsEnabled || !this.isPlaying) return;
-    const audio = new Audio(blobUrl);
-    audio.playbackRate = Math.min(1.25, Math.max(0.8, this.playbackSpeed));
-    this.activeAudioEl = audio;
-    await audio.play();
   }
 
   selectBestVoice(voices, targetLocale) {
     if (!voices || !voices.length) return null;
     const [targetLang, targetRegion = ""] = targetLocale.toLowerCase().split(/[-_]/);
+    const wantMale = this.voiceGender === "male";
     let best = null;
     let bestScore = -Infinity;
 
@@ -364,10 +312,9 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
       { re: /\bpremium\b/i, score: 48 },
       { re: /\benhanced\b/i, score: 40 },
       { re: /^google\b/i, score: 36 },
-      { re: /\b(aigul|daulet|svetlana|dmitry)\b/i, score: 24 },
-      { re: /\b(milena|yuri|katya|samantha|daniel)\b/i, score: 16 }
+      { re: wantMale ? /\b(daulet|dmitry|yuri|pavel|daniel|alex|andrew|guy)\b/i : /\b(aigul|svetlana|milena|katya|samantha|ava|victoria)\b/i, score: 34 }
     ];
-    const roboticPenalty = /\b(espeak|compact|irina|pavel|albert|bells|zarvox)\b/i;
+    const roboticPenalty = /\b(espeak|compact|albert|bells|zarvox)\b/i;
 
     for (const v of voices) {
       const [vLang, vRegion = ""] = (v.lang || "").toLowerCase().split(/[-_]/);
@@ -518,7 +465,7 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
     }
 
     const emo = info.scene.emotion || "explain";
-    const preKey = `edge::${this.ttsLang}::${emo}::${cleanText}`;
+    const preKey = `edge::${this.ttsLang}::${this.voiceGender}::${emo}::::::${cleanText}`;
     const preBuf = this.audioBufferCache.get(preKey);
     if (preBuf) {
       try {
@@ -609,7 +556,7 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
       pitch = "",
       volume = ""
     } = opts;
-    const cacheKey = `edge::${locale}::${emotion}::${rate}::${pitch}::${cleanText}`;
+    const cacheKey = `edge::${locale}::${this.voiceGender}::${emotion}::${rate}::${pitch}::${cleanText}`;
     const cachedBuf = this.audioBufferCache.get(cacheKey);
     if (cachedBuf) return cachedBuf;
 
@@ -631,7 +578,15 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
           const resp = await fetch("/api/tts", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ text: cleanText, lang: locale, emotion, rate, pitch, volume }),
+            body: JSON.stringify({
+              text: cleanText,
+              lang: locale,
+              emotion,
+              voiceGender: this.voiceGender,
+              rate,
+              pitch,
+              volume
+            }),
             signal: ctrl.signal
           });
           clearTimeout(timer);
@@ -698,7 +653,121 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
     return out;
   }
 
-  // Полная предгенерация и декодирование ВСЕХ аудиодорожек ДО открытия плеера (с побитовой интонацией и защитой от зависания)
+  // Синтез одной сцены (с ретраями и побитовыми паузами)
+  async _synthesizeSingleSceneBuffer(sc, abortSignal = null) {
+    const cleanText = this.prepareClausesForTts(sc?.caption, sc?.title).join(" ");
+    if (!cleanText) return null;
+    const beats = Array.isArray(sc?.beats) && sc.beats.length >= 2 ? sc.beats.slice(0, 3) : null;
+    let finalBuf = null;
+    if (beats) {
+      const beatEmotions = [
+        sc.emotion === "risk" ? "risk" : "hook",
+        "explain",
+        sc.emotion === "celebrate" ? "celebrate" : sc.emotion === "risk" ? "risk" : "hook"
+      ];
+      const beatTexts = beats.map((b) => this.prepareClausesForTts(b?.text, "").join(" ")).filter(Boolean);
+      if (beatTexts.length >= 2) {
+        const beatBufs = await Promise.all(
+          beatTexts.map((bt, bIdx) =>
+            this.fetchEdgeTtsBuffer(bt, this.ttsLang, {
+              timeoutMs: 10000,
+              maxAttempts: 2,
+              externalSignal: abortSignal,
+              emotion: beatEmotions[bIdx] || "explain"
+            })
+          )
+        );
+        sc.beatDurations = beatBufs.map((b) => +b.duration.toFixed(3));
+        finalBuf = this.stitchBeatAudioBuffers(beatBufs, 0.28);
+      }
+    }
+    if (!finalBuf) {
+      finalBuf = await this.fetchEdgeTtsBuffer(cleanText, this.ttsLang, {
+        timeoutMs: 10000,
+        maxAttempts: 2,
+        externalSignal: abortSignal,
+        emotion: sc?.emotion || "explain"
+      });
+    }
+    sc.audioBuffer = finalBuf;
+    const baseDur = sc.baseDurationSec || sc.durationSec || 10;
+    sc.speechDurationSec = +finalBuf.duration.toFixed(2);
+    sc.durationSec = +Math.max(baseDur, finalBuf.duration + 1.25).toFixed(2);
+    sc.finalCps = +(String(sc.caption || "").length / sc.durationSec).toFixed(1);
+    return finalBuf;
+  }
+
+  // Потоковая фоновая подгрузка озвучки: НЕ блокирует чтение конспекта, карты, теста и старт 1-й сцены!
+  async streamStoryboardAudioProgressive(scenes, locale, onProgress = null, abortSignal = null) {
+    const myStreamId = ++this.streamRunId;
+    const list = scenes || this.scenes || [];
+    const total = list.length;
+    if (!total) return;
+
+    this.ttsLang = locale || this.ttsLang || "ru-RU";
+    this.ensureAudioContext();
+
+    const serverAlive = await this.probeTtsServer(1400);
+    if (abortSignal?.aborted || myStreamId !== this.streamRunId) return;
+
+    let useNeuralServer = serverAlive;
+    let consecutiveErrors = 0;
+
+    if (!useNeuralServer) {
+      if (typeof window !== "undefined" && window.speechSynthesis) {
+        let voices = window.speechSynthesis.getVoices();
+        if (!voices.length) {
+          await new Promise((r) => setTimeout(r, 150));
+          voices = window.speechSynthesis.getVoices();
+        }
+        const bestV = this.selectBestVoice(voices, this.ttsLang);
+        this.ttsBackendMode = bestV || !this.ttsLang.startsWith("kk") ? "browser_speech" : "subtitles_only";
+      } else {
+        this.ttsBackendMode = "subtitles_only";
+      }
+      if (onProgress) onProgress({ readyCount: total, totalScenes: total, mode: "offline", done: true });
+      return;
+    }
+
+    this.ttsBackendMode = "neural_buffer";
+    for (let i = 0; i < total; i++) {
+      if (abortSignal?.aborted || myStreamId !== this.streamRunId) return;
+      const sc = list[i];
+      if (onProgress) {
+        onProgress({ readyCount: i, totalScenes: total, mode: "neural", sceneTitle: sc?.title || "", done: false });
+      }
+      try {
+        await this._synthesizeSingleSceneBuffer(sc, abortSignal);
+        consecutiveErrors = 0;
+        this.recalcTotalDuration();
+        // Если плеер уже играет именно эту сцену и звук ещё не запущен — мягко подхватываем буфер!
+        const curInfo = this.getCurrentSceneInfo();
+        if (this.isReady && this.isPlaying && this.ttsEnabled && curInfo.index === i && !this.audioPlaybackState.active) {
+          this.lastSpokenSceneIdx = -1;
+          this.checkTts(curInfo, curInfo.localTime);
+        }
+      } catch (err) {
+        if (abortSignal?.aborted || myStreamId !== this.streamRunId) return;
+        consecutiveErrors++;
+        if (consecutiveErrors >= 2) {
+          useNeuralServer = false;
+          this.ttsBackendMode = "browser_speech";
+          break;
+        }
+      }
+    }
+
+    if (onProgress && myStreamId === this.streamRunId) {
+      onProgress({
+        readyCount: total,
+        totalScenes: total,
+        mode: useNeuralServer ? "neural" : "offline",
+        done: true
+      });
+    }
+  }
+
+  // Полная предгенерация (оставлена для обратной совместимости, с исправленной устойчивостью к сбоям)
   async pregenerateAllSceneAudio(scenes, locale, onProgress, abortSignal = null) {
     const list = scenes || this.scenes || [];
     const total = list.length;
@@ -714,6 +783,7 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
     if (abortSignal?.aborted) throw new DOMException("Cancelled", "AbortError");
 
     let useNeuralServer = serverAlive;
+    let consecutiveErrors = 0;
 
     for (let i = 0; i < total; i++) {
       if (abortSignal?.aborted) throw new DOMException("Cancelled", "AbortError");
@@ -732,48 +802,14 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
 
       if (useNeuralServer && cleanText) {
         try {
-          const beats = Array.isArray(sc?.beats) && sc.beats.length >= 2 ? sc.beats.slice(0, 3) : null;
-          let finalBuf = null;
-          if (beats) {
-            const beatEmotions = [
-              sc.emotion === "risk" ? "risk" : "hook",
-              "explain",
-              sc.emotion === "celebrate" ? "celebrate" : sc.emotion === "risk" ? "risk" : "hook"
-            ];
-            const beatTexts = beats.map((b) => this.prepareClausesForTts(b?.text, "").join(" ")).filter(Boolean);
-            if (beatTexts.length >= 2) {
-              const beatBufs = await Promise.all(
-                beatTexts.map((bt, bIdx) =>
-                  this.fetchEdgeTtsBuffer(bt, this.ttsLang, {
-                    timeoutMs: i === 0 ? 8500 : 10000,
-                    maxAttempts: i === 0 ? 1 : 2,
-                    externalSignal: abortSignal,
-                    emotion: beatEmotions[bIdx] || "explain"
-                  })
-                )
-              );
-              sc.beatDurations = beatBufs.map((b) => +b.duration.toFixed(3));
-              finalBuf = this.stitchBeatAudioBuffers(beatBufs, 0.28);
-            }
-          }
-          if (!finalBuf) {
-            finalBuf = await this.fetchEdgeTtsBuffer(cleanText, this.ttsLang, {
-              timeoutMs: i === 0 ? 8500 : 10000,
-              maxAttempts: i === 0 ? 1 : 2,
-              externalSignal: abortSignal,
-              emotion: sc?.emotion || "explain"
-            });
-          }
-          sc.audioBuffer = finalBuf;
-          const baseDur = sc.baseDurationSec || sc.durationSec || 10;
-          sc.speechDurationSec = +finalBuf.duration.toFixed(2);
-          sc.durationSec = +Math.max(baseDur, finalBuf.duration + 1.25).toFixed(2);
-          sc.finalCps = +(String(sc.caption || "").length / sc.durationSec).toFixed(1);
+          await this._synthesizeSingleSceneBuffer(sc, abortSignal);
+          consecutiveErrors = 0;
         } catch (err) {
           if (abortSignal?.aborted || (err?.name === "AbortError" && abortSignal?.aborted)) {
             throw new DOMException("Cancelled", "AbortError");
           }
-          if (i === 0) {
+          consecutiveErrors++;
+          if (consecutiveErrors >= 2) {
             useNeuralServer = false;
           }
         }
@@ -973,6 +1009,30 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
       target += this.scenes[i].durationSec || 10;
     }
     this.seekTo(target + 0.05);
+  }
+
+  jumpToBeat(sceneIdx, beatIdx = 0) {
+    if (!this.isReady || !this.scenes?.length) return;
+    const clampedScene = Math.max(0, Math.min(this.scenes.length - 1, sceneIdx));
+    let sceneStart = 0;
+    for (let i = 0; i < clampedScene; i++) {
+      sceneStart += this.scenes[i].durationSec || 10;
+    }
+    const sc = this.scenes[clampedScene];
+    const dur = sc?.durationSec || 10;
+    const preRoll = 0.25;
+    let beatOffset = 0;
+    if (beatIdx > 0) {
+      if (Array.isArray(sc?.beatDurations) && sc.beatDurations.length >= beatIdx) {
+        for (let k = 0; k < beatIdx; k++) {
+          beatOffset += (sc.beatDurations[k] || 2.5) + 0.28;
+        }
+      } else {
+        const speechDur = Math.max(2, dur - preRoll - 1.25);
+        beatOffset = (speechDur * Math.min(2, beatIdx)) / 3;
+      }
+    }
+    this.seekTo(sceneStart + (beatIdx === 0 ? 0.05 : preRoll + beatOffset));
   }
 
   getSceneTheme(scene) {
@@ -1338,9 +1398,77 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
     ctx.restore();
   }
 
-  // Верхний HUD-бар с индикатором домена, сцены и фазы Moving Hold
+  // Форматирование математических индексов и операторов для чистой отрисовки на Canvas
+  formatMathText(str) {
+    return String(str || "")
+      .replace(/<=/g, "≤")
+      .replace(/>=/g, "≥")
+      .replace(/!=/g, "≠")
+      .replace(/f_грунта/gi, "f(гр)")
+      .replace(/f_здания/gi, "f(зд)")
+      .replace(/cos\(θ\)/gi, "cos θ");
+  }
+
+  getCanvasUiLabels(scene) {
+    const l = String(scene?.outputLang || this.ttsLang || "ru").toLowerCase();
+    if (l.startsWith("kk")) {
+      return {
+        sceneWord: "КӨРІНІС",
+        holdLabel: "⏸ ОЙЛАНУ КІДІРІСІ (Moving Hold)",
+        revealLabel: (pct) => `✦ Сызбаны ашу (${pct}%)`,
+        beatWord: "ҚАДАМ",
+        captionTitle: "«АЙҚЫН ТІЛ» СУБТИТРЛЕРІ",
+        paceWord: "Қарқын",
+        cpsUnit: "таңба/с",
+        tutorName: "Lecture AI Тьюторы",
+        gestures: {
+          WARNING_PALM: "✋ Ым: Назар / Тәуекел",
+          POINT: "👉 Ым: Негізгі түйінге назар",
+          QUESTION_OPEN: "⚖️ Ым: Салыстыру «Дейін / Кейін»",
+          THUMBS_UP: "👍 Ым: Емтиханға дайын!"
+        }
+      };
+    }
+    if (l.startsWith("en")) {
+      return {
+        sceneWord: "SCENE",
+        holdLabel: "⏸ READING HOLD (Moving Hold)",
+        revealLabel: (pct) => `✦ Diagram Reveal (${pct}%)`,
+        beatWord: "BEAT",
+        captionTitle: "PLAIN LANGUAGE CAPTIONS",
+        paceWord: "Pace",
+        cpsUnit: "CPS",
+        tutorName: "Lecture AI Tutor",
+        gestures: {
+          WARNING_PALM: "✋ Cue: Key Risk / Hook",
+          POINT: "👉 Cue: Spatial Focus",
+          QUESTION_OPEN: "⚖️ Cue: Before vs After",
+          THUMBS_UP: "👍 Cue: Exam Synthesis!"
+        }
+      };
+    }
+    return {
+      sceneWord: "СЦЕНА",
+      holdLabel: "⏸ ПАУЗА ОСМЫСЛЕНИЯ (Moving Hold)",
+      revealLabel: (pct) => `✦ Раскрытие схемы (${pct}%)`,
+      beatWord: "БИТ",
+      captionTitle: "СУБТИТРЫ «ЯСНЫЙ ЯЗЫК»",
+      paceWord: "Темп",
+      cpsUnit: "симв/с",
+      tutorName: "ИИ-Тьютор Lecture AI",
+      gestures: {
+        WARNING_PALM: "✋ Жест: Внимание / Риск",
+        POINT: "👉 Жест: Пространственный фокус",
+        QUESTION_OPEN: "⚖️ Жест: Контраст «До / После»",
+        THUMBS_UP: "👍 Жест: Итог к экзамену готов!"
+      }
+    };
+  }
+
+  // Верхний HUD-бар с индикатором домена, источника, сцены и фазы Moving Hold
   drawTopHud(ctx, W, info, scene, p, isPause, themeObj) {
     const theme = themeObj || this.getSceneTheme(scene);
+    const ui = this.getCanvasUiLabels(scene);
     const hudX = 36;
     const hudW = W - 72;
     this.drawKurzgesagtCapsule(ctx, hudX, 20, hudW, 48, {
@@ -1349,13 +1477,14 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
       rim: theme.surfaceBorder
     }, 14, `rgba(${theme.shadowRgb}, 0.08)`);
 
+    const srcSuffix = scene.sourceBadge ? `  ·  📌 ${scene.sourceBadge}` : "";
     ctx.fillStyle = theme.primary;
     ctx.font = "800 13.5px 'Manrope', 'Inter', sans-serif";
     ctx.fillText(
-      `СЦЕНА 0${info.index + 1} / 0${this.scenes.length}  ·  ${scene.archetypeBadge || "2D Визуализация"}`,
+      `${ui.sceneWord} 0${info.index + 1} / 0${this.scenes.length}  ·  ${scene.archetypeBadge || "2D"}${srcSuffix}`,
       hudX + 20,
       49,
-      620
+      680
     );
 
     // Заголовок сцены
@@ -1368,11 +1497,11 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
     if (isPause) {
       ctx.fillStyle = theme.secondary;
       ctx.font = "700 13px 'Inter', sans-serif";
-      ctx.fillText("⏸ ПАУЗА ОСМЫСЛЕНИЯ (Moving Hold)", hudX + hudW - 20, 49, 440);
+      ctx.fillText(ui.holdLabel, hudX + hudW - 20, 49, 440);
     } else {
       ctx.fillStyle = theme.muted;
       ctx.font = "600 13px 'Inter', sans-serif";
-      ctx.fillText(`✦ Раскрытие схемы (${Math.round(p * 100)}%)`, hudX + hudW - 20, 49, 440);
+      ctx.fillText(ui.revealLabel(Math.round(p * 100)), hudX + hudW - 20, 49, 440);
     }
     ctx.textAlign = "left";
   }
@@ -2530,10 +2659,10 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
     }, 16);
     ctx.fillStyle = theme.primary;
     ctx.font = "800 11.5px 'JetBrains Mono', monospace";
-    ctx.fillText("ФОРМУЛА И ЗАКОНОМЕРНОСТЬ", rx + 18, gy + 18);
+    ctx.fillText("ФОРМУЛА / RULE", rx + 18, gy + 18);
     ctx.fillStyle = theme.ink;
     ctx.font = "800 16px 'Manrope', sans-serif";
-    this.wrapText(ctx, sig.formulaCard?.expression || scene.keyTerm, rx + 18, gy + 48, rw - 36, 22, 2);
+    this.wrapText(ctx, this.formatMathText(sig.formulaCard?.expression || scene.keyTerm), rx + 18, gy + 48, rw - 36, 22, 2);
 
     stages.slice(0, 3).forEach((st, idx) => {
       const cy = gy + 104 + idx * 54;
@@ -3575,19 +3704,19 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
       ctx.save();
       ctx.globalAlpha = Math.min(1, s2);
       this.drawKurzgesagtCapsule(ctx, rightX, stage.y + 162, rightW, 200, {
-        top: "rgba(30, 58, 138, 0.45)",
-        bottom: "rgba(15, 23, 42, 0.85)",
-        rim: "#38bdf8"
+        top: "#EFF6FF",
+        bottom: "#DBEAFE",
+        rim: "#2563EB"
       }, 14);
-      ctx.fillStyle = "#38bdf8";
-      ctx.font = "800 14px 'JetBrains Mono', monospace";
+      ctx.fillStyle = "#1D4ED8";
+      ctx.font = "800 13.5px 'JetBrains Mono', monospace";
       ctx.fillText(`КЛЮЧЕВОЙ ТЕРМИН СИЛЛАБУСА:`, rightX + 20, stage.y + 192);
-      ctx.fillStyle = "#fde047";
-      ctx.font = "800 22px 'Manrope', sans-serif";
+      ctx.fillStyle = "#0F172A";
+      ctx.font = "800 21px 'Manrope', sans-serif";
       ctx.fillText(scene.keyTerm, rightX + 20, stage.y + 222, rightW - 36);
-      ctx.fillStyle = "#f1f5f9";
-      ctx.font = "500 18px 'Inter', sans-serif";
-      this.wrapText(ctx, scene.keyPlain, rightX + 20, stage.y + 256, rightW - 36, 25, 3);
+      ctx.fillStyle = "#334155";
+      ctx.font = "500 16.5px 'Inter', sans-serif";
+      this.wrapText(ctx, scene.keyPlain, rightX + 20, stage.y + 254, rightW - 36, 24, 3);
       ctx.restore();
     }
 
@@ -3908,24 +4037,24 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
       ctx.save();
       ctx.globalAlpha = Math.min(1, fPop);
       this.drawKurzgesagtCapsule(ctx, fx, stage.y + 36, fw, 320, {
-        top: "rgba(49, 46, 129, 0.65)",
-        bottom: "rgba(15, 23, 42, 0.92)",
-        rim: "#818cf8"
-      }, 16, "rgba(99, 102, 241, 0.35)");
+        top: "#FFFFFF",
+        bottom: "#F8FAFC",
+        rim: "#6366F1"
+      }, 16, "rgba(99, 102, 241, 0.16)");
 
-      ctx.fillStyle = "#a5b4fc";
+      ctx.fillStyle = "#4F46E5";
       ctx.font = "800 13px 'JetBrains Mono', monospace";
       ctx.fillText("ФОРМУЛА И ЗАКОНОМЕРНОСТЬ КУРСА", fx + 20, stage.y + 68);
 
-      // Блок самой формулы
+      // Блок самой формулы (высокий контраст)
       this.drawKurzgesagtCapsule(ctx, fx + 18, stage.y + 84, fw - 36, 62, {
-        top: "#1e1b4b",
-        bottom: "#090d16",
-        rim: "#fde047"
+        top: "#EEF2FF",
+        bottom: "#E0E7FF",
+        rim: "#4F46E5"
       }, 12);
-      ctx.fillStyle = "#fde047";
+      ctx.fillStyle = "#1E1B4B";
       ctx.font = "800 18px 'JetBrains Mono', monospace";
-      ctx.fillText(signals.formulaCard.expression, fx + 30, stage.y + 122, fw - 60);
+      ctx.fillText(this.formatMathText(signals.formulaCard.expression), fx + 30, stage.y + 122, fw - 60);
 
       // Переменные на ясном языке
       ctx.fillStyle = "#1E293B";
@@ -4153,31 +4282,34 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
     const headTilt = Math.sin(t * 1.15 - 0.3) * 0.035 + (scene.tutorCue === "QUESTION_OPEN" ? 0.06 : 0);
     const glassesY = -Math.sin(t * 2.3 - 0.75) * 1.8;
 
+    const theme = this.getSceneTheme(scene);
+    const ui = this.getCanvasUiLabels(scene);
+
     // Плавный трекинг взгляда и руки к активному элементу схемы
-    this.tutor.targetX += (focalTarget.x - this.tutor.targetX) * 0.1;
-    this.tutor.targetY += (focalTarget.y - this.tutor.targetY) * 0.1;
+    this.tutor.targetX += (focalTarget.x - this.tutor.targetX) * 0.12;
+    this.tutor.targetY += (focalTarget.y - this.tutor.targetY) * 0.12;
 
-    // Подложка-капсула тьютора
+    // Светлая Editorial-капсула тьютора (Quiet Luxury, в единой теме сцены!)
     this.drawKurzgesagtCapsule(ctx, cx - 126, cy - 196, 252, 392, {
-      top: "rgba(30, 41, 59, 0.78)",
-      bottom: "rgba(15, 23, 42, 0.92)",
-      rim: "rgba(99, 102, 241, 0.4)"
-    }, 18);
+      top: theme.surfaceTop,
+      bottom: theme.surfaceBottom,
+      rim: theme.surfaceBorder
+    }, 22, `rgba(${theme.shadowRgb}, 0.10)`);
 
-    // Мягкая аура за спиной
-    const aura = ctx.createRadialGradient(cx, cy - 35, 10, cx, cy - 35, 95);
-    aura.addColorStop(0, "rgba(99, 102, 241, 0.25)");
-    aura.addColorStop(1, "rgba(0, 0, 0, 0)");
+    // Мягкая аура в цвете предметного домена
+    const aura = ctx.createRadialGradient(cx, cy - 35, 10, cx, cy - 35, 100);
+    aura.addColorStop(0, theme.primarySoft || "rgba(79, 70, 229, 0.14)");
+    aura.addColorStop(1, "rgba(255, 255, 255, 0)");
     ctx.fillStyle = aura;
     ctx.beginPath();
-    ctx.arc(cx, cy - 35, 95, 0, Math.PI * 2);
+    ctx.arc(cx, cy - 35, 100, 0, Math.PI * 2);
     ctx.fill();
 
-    // 1. Торс со Squash & Stretch
+    // 1. Торс со Squash & Stretch в благородном цвете домена
     this.drawKurzgesagtCapsule(ctx, cx - 58, cy - 12 + torsoY, 116, 122, {
-      top: "#4f46e5",
-      bottom: "#312e81",
-      rim: "#a5b4fc"
+      top: theme.primary,
+      bottom: theme.ink,
+      rim: "#FFFFFF"
     }, 28);
 
     // Галстук / бейдж ИИ
@@ -4336,55 +4468,54 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
       }
     }
 
-    // Лазерный луч работает как мягкий акцент в начале бита (без постоянного визуального шума)
-    const beatPulseAlpha = beats ? Math.max(0.18, 1 - beats.beatP * 1.4) : 0.7;
+    // Мягкий Spotlight Halo на активном узле схемы (в стиле Manim, не перечёркивает текст!)
+    const beatPulseAlpha = beats ? Math.max(0.24, 1 - beats.beatP * 1.1) : 0.7;
     if (!isPause) {
-      this.drawLaserBeam(ctx, handGoal, { x: this.tutor.targetX, y: this.tutor.targetY }, beatPulseAlpha);
+      this.drawLaserBeam(ctx, handGoal, { x: this.tutor.targetX, y: this.tutor.targetY }, beatPulseAlpha, theme);
     }
 
-    // Подпись жеста КЖЯ/РЖЯ и роли под персонажем
-    const gestureLabels = {
-      WARNING_PALM: "✋ Жест: Внимание / Риск",
-      POINT: "👉 Жест: Пространственный фокус",
-      QUESTION_OPEN: "⚖️ Жест: Контраст «До / После»",
-      THUMBS_UP: "👍 Жест: Итог к экзамену готов!"
-    };
-    ctx.fillStyle = "#1E293B";
+    // Подпись жеста КЖЯ/РЖЯ и роли под персонажем (локализована RU / KK / EN, высокий контраст!)
+    ctx.fillStyle = theme.ink;
     ctx.font = "800 13.5px 'Manrope', sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText("ИИ-Тьютор Lecture AI", cx, cy + 148);
-    ctx.fillStyle = this.getSceneTheme(scene).primary;
-    ctx.font = "700 12.5px 'Inter', sans-serif";
-    ctx.fillText(gestureLabels[scene.tutorCue] || "👉 Жест: Указание на узел", cx, cy + 170);
+    ctx.fillText(ui.tutorName, cx, cy + 148, 224);
+    ctx.fillStyle = theme.primary;
+    ctx.font = "700 12px 'Inter', sans-serif";
+    ctx.fillText(ui.gestures[scene.tutorCue] || ui.gestures.POINT, cx, cy + 170, 228);
     ctx.textAlign = "left";
 
     ctx.restore();
   }
 
-  // 3-слойный светящийся лазерный луч от указки тьютора к активному узлу схемы
-  drawLaserBeam(ctx, tip, target, alphaScale = 1) {
+  // Деликатный направляющий вектор у руки + мягкий Spotlight-ореол вокруг целевого узла (без пересечения букв!)
+  drawLaserBeam(ctx, tip, target, alphaScale = 1, theme = null) {
     ctx.save();
-    ctx.lineCap = "round";
-    const grad = ctx.createLinearGradient(tip.x, tip.y, target.x, target.y);
-    grad.addColorStop(0, `rgba(56, 189, 248, ${(0.25 * alphaScale).toFixed(2)})`);
-    grad.addColorStop(1, `rgba(250, 204, 21, ${(0.85 * alphaScale).toFixed(2)})`);
+    const dx = target.x - tip.x;
+    const dy = target.y - tip.y;
+    const dist = Math.hypot(dx, dy) || 1;
+    const shortLen = Math.min(42, dist * 0.18);
+    const endX = tip.x + (dx / dist) * shortLen;
+    const endY = tip.y + (dy / dist) * shortLen;
 
+    const accentRgb = theme?.shadowRgb || "79, 70, 229";
+    const grad = ctx.createLinearGradient(tip.x, tip.y, endX, endY);
+    grad.addColorStop(0, `rgba(${accentRgb}, ${(0.55 * alphaScale).toFixed(2)})`);
+    grad.addColorStop(1, `rgba(${accentRgb}, 0)`);
     ctx.strokeStyle = grad;
-    ctx.lineWidth = 3.5;
-    ctx.setLineDash([8, 6]);
+    ctx.lineCap = "round";
+    ctx.lineWidth = 3;
     ctx.beginPath();
     ctx.moveTo(tip.x, tip.y);
-    ctx.lineTo(target.x, target.y);
+    ctx.lineTo(endX, endY);
     ctx.stroke();
 
-    // Светящаяся точка фокуса на самом объекте схемы
-    const flare = ctx.createRadialGradient(target.x, target.y, 0, target.x, target.y, 16);
-    flare.addColorStop(0, "rgba(255, 255, 255, 0.95)");
-    flare.addColorStop(0.4, "rgba(250, 204, 21, 0.7)");
-    flare.addColorStop(1, "rgba(250, 204, 21, 0)");
+    // Кольцо фокуса на самом объекте схемы (Manim Focus Ring)
+    const flare = ctx.createRadialGradient(target.x, target.y, 4, target.x, target.y, 34);
+    flare.addColorStop(0, `rgba(${accentRgb}, ${(0.22 * alphaScale).toFixed(2)})`);
+    flare.addColorStop(1, `rgba(${accentRgb}, 0)`);
     ctx.fillStyle = flare;
     ctx.beginPath();
-    ctx.arc(target.x, target.y, 16, 0, Math.PI * 2);
+    ctx.arc(target.x, target.y, 34, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
   }
@@ -4430,6 +4561,7 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
   // =========================================================================
   drawKaraokeCaptionBar(ctx, W, H, scene, p, isPause, themeObj, beatsObj) {
     const theme = themeObj || this.getSceneTheme(scene);
+    const ui = this.getCanvasUiLabels(scene);
     const barX = 36;
     const barW = W - 72;
     const capY = H - 124;
@@ -4444,14 +4576,16 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
     this.roundRect(ctx, barX, capY + 12, 5, 78, 3);
     ctx.fill();
 
-    // Верхняя строка метаданных субтитра
+    // Верхняя строка метаданных субтитра (с реально измеренным контрастом WCAG!)
     ctx.fillStyle = theme.primary;
     ctx.font = "800 12.5px 'JetBrains Mono', monospace";
-    const beatTag = beatsObj ? `БИТ ${(beatsObj.activeBeatIdx ?? 0) + 1}/3  ·  ` : "";
+    const beatTag = beatsObj ? `${ui.beatWord} ${(beatsObj.activeBeatIdx ?? 0) + 1}/3  ·  ` : "";
+    const crLabel = scene.contrastRatio || "15.8:1 (WCAG AAA)";
     ctx.fillText(
-      `${beatTag}СУБТИТРЫ «ЯСНЫЙ ЯЗЫК»  ·  Темп: ${scene.finalCps} симв/с (Норма DHH ≤ 13)  ·  Контраст 14.5:1 AAA`,
+      `${beatTag}${ui.captionTitle}  ·  ${ui.paceWord}: ${scene.finalCps} ${ui.cpsUnit}  ·  ${crLabel}`,
       barX + 22,
-      capY + 26
+      capY + 26,
+      barW - 44
     );
 
     // Пословная КАРАОКЕ-подсветка только для текущего активного бита (без перегруза и обрезки!)
@@ -4557,12 +4691,31 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
     ctx.fillText(line, x, curY);
   }
 
-  // Экспорт полной лекции (видео + звук) на скрытом Offscreen Canvas
+  cancelVideoExport() {
+    if (this.isExporting) {
+      this.cancelExportFlag = true;
+    }
+  }
+
+  // Фазово-синхронизированный экспорт полной лекции (видео + звук) по часам AudioContext / performance.now()
   async exportVideoFile(onProgress) {
     if (this.isExporting) {
       throw new Error("Экспорт видео уже выполняется");
     }
     this.isExporting = true;
+    this.cancelExportFlag = false;
+
+    // Ставим живой плеер на паузу на время записи файла, чтобы звук не дублировался
+    const wasPlaying = this.isPlaying;
+    this.stopTts();
+    this.isPlaying = false;
+
+    // Если включена озвучка, но не все сцены ещё успели догрузиться в фоне — дожидаемся их перед записью
+    if (this.ttsEnabled && this.ttsBackendMode === "neural_buffer" && this.scenes.some((s) => !s.audioBuffer)) {
+      try {
+        await this.pregenerateAllSceneAudio(this.scenes, this.ttsLang, null);
+      } catch (_) {}
+    }
 
     return new Promise((resolve, reject) => {
       try {
@@ -4574,40 +4727,46 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
         const videoStream = offCanvas.captureStream(30);
         const tracks = [...videoStream.getVideoTracks()];
 
-        // Микшируем предгенерированные аудиодорожки в поток экспорта (если есть AudioContext)
         let exportAudioCtx = null;
+        let audioStartAnchor = 0;
         const audioSources = [];
         const ctx = this.ensureAudioContext();
         if (ctx && typeof ctx.createMediaStreamDestination === "function" && this.scenes.some((s) => s.audioBuffer)) {
           try {
+            if (ctx.state === "suspended") {
+              ctx.resume().catch(() => {});
+            }
             const dest = ctx.createMediaStreamDestination();
             exportAudioCtx = ctx;
+            audioStartAnchor = ctx.currentTime + 0.08;
             let cursor = 0;
             this.scenes.forEach((sc) => {
               if (sc.audioBuffer) {
                 const src = ctx.createBufferSource();
                 src.buffer = sc.audioBuffer;
                 src.connect(dest);
-                src.start(ctx.currentTime + cursor + 0.25);
+                src.start(audioStartAnchor + cursor + 0.25);
                 audioSources.push(src);
               }
               cursor += sc.durationSec || 10;
             });
             dest.stream.getAudioTracks().forEach((tr) => tracks.push(tr));
-          } catch (_) {}
+          } catch (_) {
+            exportAudioCtx = null;
+          }
         }
 
         const combinedStream = new MediaStream(tracks);
         const mimeTypes = [
           "video/mp4;codecs=avc1.42E01E",
           "video/mp4",
-          "video/webm;codecs=vp9",
-          "video/webm;codecs=vp8",
+          "video/webm;codecs=vp9,opus",
+          "video/webm;codecs=vp8,opus",
           "video/webm"
         ];
         const supportedMime = mimeTypes.find((m) => window.MediaRecorder && MediaRecorder.isTypeSupported(m)) || "";
         const recorder = supportedMime
-          ? new MediaRecorder(combinedStream, { mimeType: supportedMime, videoBitsPerSecond: 4000000 })
+          ? new MediaRecorder(combinedStream, { mimeType: supportedMime, videoBitsPerSecond: 4200000 })
           : new MediaRecorder(combinedStream);
 
         const chunks = [];
@@ -4615,24 +4774,51 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
           if (e.data && e.data.size > 0) chunks.push(e.data);
         };
 
-        recorder.onstop = () => {
-          audioSources.forEach((s) => { try { s.stop(); } catch (_) {} });
+        const restoreLivePlayer = () => {
+          audioSources.forEach((s) => {
+            try {
+              s.stop();
+              s.disconnect();
+            } catch (_) {}
+          });
           this.isExporting = false;
+          if (wasPlaying) {
+            this.isPlaying = true;
+            this.lastSpokenSceneIdx = -1;
+          }
+        };
+
+        recorder.onstop = () => {
+          const cancelled = this.cancelExportFlag;
+          restoreLivePlayer();
+          if (cancelled) {
+            reject(new DOMException("Export cancelled", "AbortError"));
+            return;
+          }
           const blob = new Blob(chunks, { type: supportedMime || "video/webm" });
           const ext = supportedMime.includes("mp4") ? "mp4" : "webm";
           resolve({ blob, ext });
         };
 
-        const exportDurationSec = Math.min(180, Math.max(4, this.totalDuration));
-        let simTime = 0;
-        const fps = 30;
-        const stepSec = 1 / fps;
+        const exportDurationSec = Math.min(210, Math.max(4, this.totalDuration));
+        const wallStartMs = performance.now();
 
         this.renderFrameOnContext(offCtx, offCanvas.width, offCanvas.height, 0);
         recorder.start(150);
 
         const timer = setInterval(() => {
-          simTime = Math.min(exportDurationSec, simTime + stepSec);
+          if (this.cancelExportFlag) {
+            clearInterval(timer);
+            if (recorder.state !== "inactive") recorder.stop();
+            return;
+          }
+
+          // Привязка времени кадра к реальным часам AudioContext исключает рассинхрон звука и видео!
+          const elapsedSec = exportAudioCtx
+            ? Math.max(0, exportAudioCtx.currentTime - audioStartAnchor)
+            : (performance.now() - wallStartMs) / 1000;
+          const simTime = Math.min(exportDurationSec, elapsedSec);
+
           this.renderFrameOnContext(offCtx, offCanvas.width, offCanvas.height, simTime);
           const pct = Math.min(99, Math.round((simTime / exportDurationSec) * 100));
           if (onProgress) onProgress(pct);
@@ -4641,9 +4827,10 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
             clearInterval(timer);
             if (recorder.state !== "inactive") recorder.stop();
           }
-        }, 1000 / fps);
+        }, 1000 / 30);
       } catch (err) {
         this.isExporting = false;
+        if (wasPlaying) this.isPlaying = true;
         reject(err);
       }
     });

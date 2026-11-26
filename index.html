@@ -117,9 +117,16 @@
           <textarea id="lectureTextInput" class="form-control lecture-textarea" rows="6" placeholder="Вставьте текст лекции сюда или загрузите файл выше..."></textarea>
         </div>
 
-        <div class="sample-link-row">
-          <span>Нет текста под рукой?</span>
-          <button type="button" class="btn-subtle-link" id="btnLoadSampleLecture">Загрузить пример лекции</button>
+        <div class="sample-presets-box mt-10">
+          <div class="sample-link-row">
+            <span>Готовые вузовские курсы в 1 клик:</span>
+          </div>
+          <div class="preset-pills-row" role="group" aria-label="Готовые примеры лекций">
+            <button type="button" class="preset-pill" data-preset-key="arch">🏛️ КазГАСА</button>
+            <button type="button" class="preset-pill" data-preset-key="ai">🤖 ИИ и RAG</button>
+            <button type="button" class="preset-pill" data-preset-key="biz">📊 AlmaU Бизнес</button>
+            <button type="button" class="preset-pill" data-preset-key="kz">🇰🇿 AI-Sana ҚАЗ</button>
+          </div>
         </div>
 
         <!-- Словарь терминов (опционально) -->
@@ -163,7 +170,7 @@
         <div class="history-list" id="historyList"></div>
       </div>
 
-      <!-- Глобальный выбор языка результата + Главная кнопка -->
+      <!-- Глобальный выбор языка результата + Deaf-First опция + Главная кнопка -->
       <div class="sidebar-footer">
 
         <div class="output-lang-box">
@@ -173,6 +180,14 @@
             <button type="button" class="btn-lang" data-lang="kk">ҚАЗ</button>
             <button type="button" class="btn-lang" data-lang="en">ENG</button>
           </div>
+          <label class="deaf-first-toggle mt-6" title="Открывать пакет без синтеза звука (0 сек ожидания для неслышащих студентов)">
+            <input type="checkbox" id="deafFirstCheckbox" />
+            <span>🦻 Режим без звука (Deaf-First · мгновенно)</span>
+          </label>
+          <label class="deaf-first-toggle mt-6" title="Игнорировать сохранённый кэш и сгенерировать материал и перевод заново">
+            <input type="checkbox" id="bypassCacheCheckbox" />
+            <span>🔄 Генерировать заново (без кэша)</span>
+          </label>
         </div>
 
         <button type="button" class="btn-primary-xl" id="btnRunPipeline">
@@ -187,20 +202,39 @@
 
     <!-- ПРАВАЯ ГЛАВНАЯ СЦЕНА: Шаг 2 -->
     <section class="stage-main" id="resultsSection" aria-labelledby="sec2-title">
-      <!-- Чистый стартовый экран до первой генерации -->
+      <!-- Чистый стартовый экран до первой генерации + витрина всех 4 пресетов -->
       <div class="empty-state-card" id="emptyStateStage">
         <div class="empty-state-icon">✦</div>
         <h2>Превратите любую лекцию в понятный конспект и 2D-мультфильм</h2>
-        <p>Загрузите презентацию, PDF или текст лекции слева, выберите язык результата (Русский, Қазақша или English) и нажмите <strong>«Создать учебный пакет»</strong>.</p>
+        <p>Загрузите презентацию, PDF или текст лекции слева, выберите язык результата (Русский, Қазақша или English) и нажмите <strong>«Создать учебный пакет»</strong> — или запустите готовый вузовский курс в 1 клик:</p>
         <div class="empty-features-row">
-          <div class="empty-feat">🎬 2D-мультфильм с озвучкой</div>
-          <div class="empty-feat">📖 Конспект на «ясном языке»</div>
-          <div class="empty-feat">🗺️ Интеллект-карта</div>
-          <div class="empty-feat">✅ Мини-тест из 5 вопросов</div>
+          <div class="empty-feat">🎬 2D-мультфильм 60 FPS</div>
+          <div class="empty-feat">📖 Ясный язык + Цитаты</div>
+          <div class="empty-feat">🗺️ 2-уровневая Mind Map</div>
+          <div class="empty-feat">✅ Умный тест + Подсказки</div>
         </div>
-        <button type="button" class="btn-primary-sm mt-10" id="btnEmptyTrySample" style="padding: 10px 20px; font-size: 0.88rem;">
-          Попробовать на примере лекции (КазГАСА)
-        </button>
+        <div class="empty-presets-grid">
+          <button type="button" class="preset-launch-card" data-preset-key="arch">
+            <span class="preset-card-tag">🏛️ Инженерия · КазГАСА</span>
+            <strong>Сейсмоизоляция и диссипация энергии</strong>
+            <span>Слайды + СНиП РК · 5 терминов</span>
+          </button>
+          <button type="button" class="preset-launch-card" data-preset-key="ai">
+            <span class="preset-card-tag">🤖 IT & Computer Science</span>
+            <strong>Архитектура Трансформеров и RAG</strong>
+            <span>Self-Attention + pgvector · 5 терминов</span>
+          </button>
+          <button type="button" class="preset-launch-card" data-preset-key="biz">
+            <span class="preset-card-tag">📊 Экономика · AlmaU</span>
+            <strong>Юнит-экономика и Break-Even стартапа</strong>
+            <span>LTV / CAC ≥ 3:1 + Kaspi кейс · 5 терминов</span>
+          </button>
+          <button type="button" class="preset-launch-card" data-preset-key="kz">
+            <span class="preset-card-tag">🇰🇿 Қазақша · AI-Sana РК</span>
+            <strong>Жасанды интеллект және Айқын тіл</strong>
+            <span>Нейрондық желілер мен RAG · Билингвалды</span>
+          </button>
+        </div>
       </div>
 
       <!-- Экран прогресса генерации видео и студийной озвучки (0%..100%, блокирует просмотр до полной готовности) -->
@@ -299,18 +333,28 @@
           <div class="video-layout">
             <div class="player-column">
               <div class="player-mode-bar no-print">
-                <button type="button" class="btn-sup-toggle active" id="btnToggleSupervisorMode">
-                  ✓ После проверки ИИ (PASS) · Показать дефект ДО
-                </button>
-                <button type="button" class="btn-chip-dark" id="btnToggleTts">
-                  🔇 Озвучка: ВЫКЛ
-                </button>
+                <div class="player-mode-actions">
+                  <button type="button" class="btn-sup-toggle active" id="btnToggleSupervisorMode">
+                    ✓ После проверки ИИ (PASS) · Показать дефект ДО
+                  </button>
+                  <span class="audio-stream-pill hidden" id="audioStreamBadge">🎧 Подготовка звука...</span>
+                </div>
+                <div class="player-mode-actions">
+                  <select id="voiceGenderSelect" class="speed-select player-voice-select" aria-label="Голос диктора" title="Выбор тембра нейронного голоса">
+                    <option value="female" selected>👩 Женский голос</option>
+                    <option value="male">👨 Мужской голос</option>
+                  </select>
+                  <button type="button" class="btn-chip-dark" id="btnToggleTts">
+                    🔊 Озвучка: ВКЛ
+                  </button>
+                </div>
               </div>
 
               <div class="canvas-wrapper" id="canvasWrapper">
                 <canvas id="animationCanvas" width="1280" height="720" aria-label="2D видео-анимация"></canvas>
                 <div class="recording-indicator hidden" id="recordingIndicator">
-                  ● Запись видео 1.0x... <span id="recordingProgressText">0%</span>
+                  <span>● Запись 1.0x... <strong id="recordingProgressText">0%</strong></span>
+                  <button type="button" class="btn-cancel-rec" id="btnCancelVideoExport" title="Отменить запись">✕</button>
                 </div>
               </div>
 
@@ -352,8 +396,8 @@
         <div class="result-panel" id="tab-notes">
           <div class="notes-toolbar no-print">
             <div class="view-mode-switch">
-              <button type="button" class="btn-mode active" data-notes-mode="dual">Ясный язык + Оригинал</button>
-              <button type="button" class="btn-mode" data-notes-mode="plain">Только Ясный язык</button>
+              <button type="button" class="btn-mode btn-notes-mode active" data-notes-mode="dual">Ясный язык + Оригинал</button>
+              <button type="button" class="btn-mode btn-notes-mode" data-notes-mode="plain">Только Ясный язык</button>
             </div>
             <div class="notes-hint">
               Нажмите на <span class="term-highlight-demo">выделенный термин</span>, чтобы увидеть простое объяснение и дактиль.
@@ -364,20 +408,26 @@
             <div class="notes-content" id="notesContent"></div>
             <aside class="glossary-sidebar">
               <div class="glossary-sidebar-header">
-                <h3>Словарь темы + Дактиль</h3>
-                <p>Нажмите на карточку для подробностей</p>
+                <div class="glossary-head-top">
+                  <h3>Словарь темы + Дактиль</h3>
+                  <button type="button" class="btn-outline-sm" id="btnToggleFlashcards" title="Режим карточек запоминания к экзамену">
+                    🃏 Карточки
+                  </button>
+                </div>
+                <input type="search" id="glossarySearchInput" class="form-control mt-6 no-print" placeholder="🔍 Поиск термина или понятия..." aria-label="Поиск по словарю" />
               </div>
+              <div class="flashcard-stage hidden no-print" id="flashcardStage"></div>
               <div class="glossary-cards-container" id="glossaryCardsContainer"></div>
             </aside>
           </div>
         </div>
 
-        <!-- ВКЛАДКА 3: ИНТЕЛЛЕКТ-КАРТА (XMind / NotebookLM стиль) -->
+        <!-- ВКЛАДКА 3: ДВУХУРОВНЕВАЯ ИНТЕЛЛЕКТ-КАРТА (Pan & Zoom) -->
         <div class="result-panel" id="tab-mindmap">
           <div class="mindmap-toolbar no-print">
             <div>
-              <h3>Интеллект-карта темы</h3>
-              <p>Нажмите на любой узел, чтобы открыть подробное объяснение</p>
+              <h3>Двухуровневая интеллект-карта (Тема → Разделы → Термины)</h3>
+              <p>Перетаскивайте карту мышью, масштабируйте колесом или нажмите на узел для разбора и перехода к сцене</p>
             </div>
             <div class="mindmap-actions">
               <button type="button" class="btn-outline-sm" id="btnZoomIn">➕</button>
@@ -393,23 +443,28 @@
           </div>
         </div>
 
-        <!-- ВКЛАДКА 4: ПОЛНОЦЕННЫЙ АДАПТИВНЫЙ ТЕСТ -->
+        <!-- ВКЛАДКА 4: ПОЛНОЦЕННЫЙ АДАПТИВНЫЙ ТЕСТ С ПОДСКАЗКАМИ -->
         <div class="result-panel" id="tab-quiz">
           <div class="quiz-header">
             <div>
               <h3 id="quizHeaderTitle">Тест по материалу (<span id="quizCountBadge">5</span> вопросов)</h3>
-              <p>Количество вопросов зависит от объёма лекции. Можно пересоздавать под новыми углами.</p>
+              <p>Используйте «💡 Подсказку» при затруднении или пересоздавайте вопросы под новыми углами.</p>
             </div>
             <div class="quiz-score-box" id="quizScoreBox">Выберите ответы ниже</div>
           </div>
           <div class="quiz-toolbar no-print">
             <div class="view-mode-switch" id="quizModeSwitch" role="group" aria-label="Режим теста">
-              <button type="button" class="btn-mode active" id="btnQuizModeFull" data-quiz-mode="full">Полный тест</button>
-              <button type="button" class="btn-mode" id="btnQuizModeQuick" data-quiz-mode="quick">Быстрый (5)</button>
+              <button type="button" class="btn-mode btn-quiz-mode active" id="btnQuizModeFull" data-quiz-mode="full">Полный тест</button>
+              <button type="button" class="btn-mode btn-quiz-mode" id="btnQuizModeQuick" data-quiz-mode="quick">Быстрый (5)</button>
             </div>
-            <button type="button" class="btn-outline" id="btnRegenerateQuiz" title="Составить новые вопросы по этой же теме с другой интерпретацией">
-              🔄 Пересоздать тест
-            </button>
+            <div class="quiz-toolbar-right">
+              <button type="button" class="btn-outline btn-filter-errors hidden" id="btnQuizFilterErrors" title="Показать только вопросы с ошибками или без ответа">
+                🔍 Только ошибки
+              </button>
+              <button type="button" class="btn-outline" id="btnRegenerateQuiz" title="Составить новые вопросы по этой же теме с другой интерпретацией">
+                🔄 Пересоздать тест
+              </button>
+            </div>
           </div>
           <div class="quiz-list" id="quizList"></div>
           <div class="quiz-footer no-print">
