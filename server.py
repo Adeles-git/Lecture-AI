@@ -287,11 +287,13 @@ def synthesize_edge_tts_cached(text, voice, rate="+0%", pitch="+0Hz", volume="+0
 
     if not is_owner:
         event.wait(timeout=28)
+        inflight_err = None
         with TTS_CACHE_LOCK:
             cached = TTS_CACHE.get(key)
             if cached is not None:
                 return cached
-        raise RuntimeError(inflight.get("error") or "TTS inflight failed")
+            inflight_err = inflight.get("error")
+        raise RuntimeError(inflight_err or "TTS inflight failed")
 
     audio_bytes = b""
     last_err = None
@@ -308,7 +310,7 @@ def synthesize_edge_tts_cached(text, voice, rate="+0%", pitch="+0Hz", volume="+0
                         break
                     last_err = "Empty TTS audio stream"
                 except Exception as err:
-                    last_err = str(err)
+                    last_err = str(err) or type(err).__name__
                     if attempt == 0:
                         time.sleep(0.25)
         if not audio_bytes:

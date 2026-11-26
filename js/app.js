@@ -207,7 +207,7 @@
                 courseTitle: l.courseTitle,
                 domainId: l.domainId,
                 glossary: new Array(l.termsCount || 0).fill(null),
-                scenes: new Array(l.scenesCount || 6).fill(null),
+                scenes: new Array(l.scenesCount || 0).fill(null),
                 _remoteOnly: true
               }));
             if (remoteItems.length) {
@@ -318,9 +318,32 @@
           localStorage.setItem(STORAGE_KEYS.DEAF_FIRST, state.deafFirstMode ? "1" : "0");
         } catch (_) {}
         if (state.animEngine && state.isMediaReady) {
-          state.animEngine.setTtsEnabled(!state.deafFirstMode);
-          const btnTts = document.getElementById("btnToggleTts");
-          if (btnTts) btnTts.textContent = state.animEngine.ttsEnabled ? "🔊 Озвучка: ВКЛ" : "🔇 Озвучка: ВЫКЛ";
+          if (!state.deafFirstMode && state.animEngine.scenes.some((s) => !s.audioBuffer)) {
+            const wasPlay = state.animEngine.isPlaying;
+            state.animEngine.pause();
+            setPlayerControlsLocked(true);
+            showFlashToast("Синтезируем озвучку перед запуском видео...", "info");
+            state.animEngine
+              .pregenerateAllSceneAudio(state.animEngine.scenes, state.animEngine.ttsLang, (prog) => {
+                updateAudioStreamBadge({ readyCount: prog.doneCount, totalScenes: prog.totalScenes, mode: prog.mode, done: false });
+              })
+              .then(() => {
+                state.animEngine.recalcTotalDuration();
+                setPlayerControlsLocked(false);
+                state.animEngine.setTtsEnabled(true);
+                updateAudioStreamBadge({ readyCount: state.animEngine.scenes.length, totalScenes: state.animEngine.scenes.length, mode: "neural", done: true });
+                const btnTts = document.getElementById("btnToggleTts");
+                if (btnTts) btnTts.textContent = "🔊 Озвучка: ВКЛ";
+                if (wasPlay) state.animEngine.play();
+              })
+              .catch(() => {
+                setPlayerControlsLocked(false);
+              });
+          } else {
+            state.animEngine.setTtsEnabled(!state.deafFirstMode);
+            const btnTts = document.getElementById("btnToggleTts");
+            if (btnTts) btnTts.textContent = state.animEngine.ttsEnabled ? "🔊 Озвучка: ВКЛ" : "🔇 Озвучка: ВЫКЛ";
+          }
         }
       });
     }
@@ -978,7 +1001,7 @@
     document.getElementById("canvasWrapper")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }
 
-  // Мгновенное открытие учебного пакета (Progressive Audio Loading: конспект, карта, тест и сцена 1 открываются сразу!)
+  // Предварительный синтез студийной озвучки (если звук включён) до открытия результата
   async function pregenerateAudioAndUnlockPlayer(result, { isCacheHit = false, myRunId, abortSignal }) {
     const localeMap = { ru: "ru-RU", kk: "kk-KZ", en: "en-US" };
     const ttsLocale = localeMap[result.outputLang || state.outputLang] || "ru-RU";
@@ -990,10 +1013,37 @@
       throw new DOMException("Cancelled", "AbortError");
     }
 
+    const wantAudio = !state.deafFirstMode;
+    if (wantAudio) {
+      const totalScenes = state.animEngine.scenes.length || 1;
+      updateGenerationProgressUI(72, `Синтез студийной озвучки (0/${totalScenes} сцен)...`, "Подготовка голосовой дорожки");
+      await state.animEngine.pregenerateAllSceneAudio(
+        state.animEngine.scenes,
+        ttsLocale,
+        (prog) => {
+          if (myRunId !== state.generationRunId || abortSignal?.aborted) return;
+          const done = prog?.doneCount ?? 0;
+          const total = prog?.totalScenes || totalScenes;
+          const pct = Math.min(98, 72 + Math.round((done / Math.max(1, total)) * 26));
+          updateGenerationProgressUI(
+            pct,
+            `Синтез студийной озвучки (${done}/${total} сцен)...`,
+            prog?.sceneTitle || "Подготовка голосовой дорожки"
+          );
+        },
+        abortSignal
+      );
+      if (myRunId !== state.generationRunId || abortSignal?.aborted) {
+        throw new DOMException("Cancelled", "AbortError");
+      }
+      state.animEngine.recalcTotalDuration();
+      result.scenes = state.animEngine.scenes.map((s) => ({ ...s, audioBuffer: undefined }));
+      updateGenerationProgressUI(100, "Готово! Запускаем 2D-мультфильм со звуком...", "Озвучка 100% готова");
+    }
+
     const genStage = document.getElementById("generationProgressStage");
     if (genStage) genStage.classList.add("hidden");
 
-    const wantAudio = !state.deafFirstMode;
     renderResultsAll(result, isCacheHit);
     setPlayerControlsLocked(false);
     state.animEngine.activateReadyStoryboard({ autoPlay: true, enableTts: wantAudio });
@@ -1004,20 +1054,7 @@
     if (btnTts) {
       btnTts.textContent = state.animEngine.ttsEnabled ? "🔊 Озвучка: ВКЛ" : "🔇 Озвучка: ВЫКЛ";
     }
-
-    // Потоковая подгрузка студийного аудио в фоне без блокировки экрана студента!
-    if (wantAudio) {
-      state.animEngine
-        .streamStoryboardAudioProgressive(state.animEngine.scenes, ttsLocale, (prog) => {
-          updateAudioStreamBadge(prog);
-          if (prog.done && state.pipelineResult === result) {
-            result.scenes = state.animEngine.scenes.map((s) => ({ ...s, audioBuffer: undefined }));
-          }
-        }, abortSignal)
-        .catch(() => {});
-    } else {
-      updateAudioStreamBadge(null);
-    }
+    updateAudioStreamBadge(null);
   }
 
   // 6. Запуск полного пайплайна со строгой блокировкой просмотра до 100% готовности видео + озвучки
@@ -1265,7 +1302,7 @@
         <div>
           <div style="font-weight:800;font-size:0.8rem;color:var(--primary);">${escapeHtml(h.courseTitle)}</div>
           <div style="font-size:0.72rem;color:var(--text-muted);">
-            Терминов: ${h.glossary?.length || 0} · Сцен: ${h.scenes?.length || 6} · ⚡ Кэш 0 ток.
+            Терминов: ${h.glossary?.length || 0} · Сцен: ${h.scenes?.length || 0} · ⚡ Кэш 0 ток.
           </div>
         </div>
         <button type="button" class="btn-del-history" data-del-hist="${idx}" title="Удалить из истории">✕</button>
@@ -1356,13 +1393,21 @@
   }
 
   function renderStoryboardList(scenes) {
+    const layoutTagMap = {
+      wide_stage: "Wide",
+      hero_intro: "Hero",
+      split_tutor: "Тьютор",
+      focus_split: "Зеркально"
+    };
     const container = document.getElementById("storyboardList");
     container.innerHTML = scenes
       .map(
-        (s, idx) => `
+        (s, idx) => {
+          const layoutLabel = layoutTagMap[s.layoutMode] || "Тьютор";
+          return `
       <div class="scene-card ${idx === 0 ? "active" : ""}" data-scene-idx="${idx}">
         <div class="scene-card-top">
-          <span>${escapeHtml(s.archetypeBadge || "СЦЕНА 0" + (idx + 1))}${s.sourceBadge ? ` · ${escapeHtml(s.sourceBadge)}` : ""}</span>
+          <span>${escapeHtml(s.archetypeBadge || "СЦЕНА 0" + (idx + 1))} · ${escapeHtml(layoutLabel)}${s.sourceBadge ? ` · ${escapeHtml(s.sourceBadge)}` : ""}</span>
           <span>✓ ${s.finalCps} симв/с · ${Math.round(s.durationSec || 12)} с</span>
         </div>
         <div class="scene-card-title">${escapeHtml(s.title)}</div>
@@ -1380,7 +1425,8 @@
                </div>`
             : ""
         }
-      </div>`
+      </div>`;
+        }
       )
       .join("");
 
@@ -1952,9 +1998,21 @@
   }
 
   function renderSupervisorTab(res) {
-    document.getElementById("supervisorChecks").innerHTML = res.supervisorLogs
-      .map(
-        (log) => `
+    const sceneRowsHtml = Array.isArray(res.scenes) && res.scenes.length
+      ? `<div class="sup-check-card">
+          <div class="sup-check-top">
+            <span>Режиссура сцен (${res.scenes.length})</span>
+            <span class="sup-pass-pill">✓ DYNAMIC</span>
+          </div>
+          <p style="font-size:0.78rem;color:var(--text-secondary);line-height:1.45;">
+            ${res.scenes.map((s, i) => `0${i + 1}: <code>${escapeHtml(s.archetype)}</code> · ${escapeHtml(s.layoutMode || "split_tutor")} · ${escapeHtml(s.transitionType || "cross_dissolve")}`).join("<br>")}
+          </p>
+        </div>`
+      : "";
+    document.getElementById("supervisorChecks").innerHTML =
+      res.supervisorLogs
+        .map(
+          (log) => `
       <div class="sup-check-card">
         <div class="sup-check-top">
           <span>${escapeHtml(log.echelon)}</span>
@@ -1962,8 +2020,8 @@
         </div>
         <p style="font-size:0.82rem;color:var(--text-secondary);">${escapeHtml(log.detail)}</p>
       </div>`
-      )
-      .join("");
+        )
+        .join("") + sceneRowsHtml;
 
     document.querySelector("#generatedCodeViewer code").textContent = res.generatedCode;
   }
@@ -2257,9 +2315,28 @@
     });
 
     // Кнопка голосовой озвучки субтитров (TTS) и выбор мужского/женского тембра
-    btnTts.addEventListener("click", () => {
+    btnTts.addEventListener("click", async () => {
       state.animEngine.unlockAudio();
       const next = !state.animEngine.ttsEnabled;
+      if (next && state.animEngine.scenes.some((s) => !s.audioBuffer)) {
+        const wasPlay = state.animEngine.isPlaying;
+        state.animEngine.pause();
+        setPlayerControlsLocked(true);
+        btnTts.textContent = "⏳ Синтез...";
+        try {
+          await state.animEngine.pregenerateAllSceneAudio(state.animEngine.scenes, state.animEngine.ttsLang, (prog) => {
+            updateAudioStreamBadge({ readyCount: prog.doneCount, totalScenes: prog.totalScenes, mode: prog.mode, done: false });
+          });
+          state.animEngine.recalcTotalDuration();
+          updateAudioStreamBadge({ readyCount: state.animEngine.scenes.length, totalScenes: state.animEngine.scenes.length, mode: "neural", done: true });
+        } finally {
+          setPlayerControlsLocked(false);
+        }
+        state.animEngine.setTtsEnabled(true);
+        btnTts.textContent = "🔊 Озвучка: ВКЛ";
+        if (wasPlay) state.animEngine.play();
+        return;
+      }
       state.animEngine.setTtsEnabled(next);
       btnTts.textContent = next ? "🔊 Озвучка: ВКЛ" : "🔇 Озвучка: ВЫКЛ";
       if (!next) updateAudioStreamBadge(null);
@@ -2268,14 +2345,37 @@
     const voiceSel = document.getElementById("voiceGenderSelect");
     if (voiceSel) {
       voiceSel.value = state.voiceGender;
-      voiceSel.addEventListener("change", () => {
+      voiceSel.addEventListener("change", async () => {
         state.voiceGender = voiceSel.value === "male" ? "male" : "female";
         try {
           localStorage.setItem(STORAGE_KEYS.VOICE, state.voiceGender);
         } catch (_) {}
         if (state.animEngine) {
           state.animEngine.unlockAudio();
-          state.animEngine.setVoiceGender(state.voiceGender);
+          state.animEngine.voiceGender = state.voiceGender;
+          state.animEngine.stopTts();
+          state.animEngine.scenes.forEach((s) => {
+            s.audioBuffer = null;
+            s.beatDurations = null;
+          });
+          if (state.isMediaReady && state.animEngine.ttsEnabled) {
+            const wasPlay = state.animEngine.isPlaying;
+            state.animEngine.pause();
+            setPlayerControlsLocked(true);
+            showFlashToast("Переозвучиваем сцены выбранным голосом...", "info");
+            try {
+              await state.animEngine.pregenerateAllSceneAudio(state.animEngine.scenes, state.animEngine.ttsLang, (prog) => {
+                updateAudioStreamBadge({ readyCount: prog.doneCount, totalScenes: prog.totalScenes, mode: prog.mode, done: false });
+              });
+              state.animEngine.recalcTotalDuration();
+              updateAudioStreamBadge({ readyCount: state.animEngine.scenes.length, totalScenes: state.animEngine.scenes.length, mode: "neural", done: true });
+            } finally {
+              setPlayerControlsLocked(false);
+            }
+            state.animEngine.lastSpokenSceneIdx = -1;
+            if (wasPlay) state.animEngine.play();
+            return;
+          }
         }
         showFlashToast(
           state.voiceGender === "male" ? "Включён мужской нейронный голос диктора." : "Включён женский нейронный голос диктора.",
@@ -2315,7 +2415,13 @@
 
     let lastUiSceneIdx = -1;
     let lastUiSec = -1;
+    let lastUiScenesRef = null;
     state.animEngine.onTimeUpdate = (cur, total, info) => {
+      if (lastUiScenesRef !== state.animEngine.scenes) {
+        lastUiScenesRef = state.animEngine.scenes;
+        lastUiSceneIdx = -1;
+        lastUiSec = -1;
+      }
       const safeTotal = Math.max(1, total);
       scrubber.value = Math.round((cur / safeTotal) * 1000);
       const curSec = Math.floor(cur);
@@ -2327,10 +2433,16 @@
       if (info.index !== lastUiSceneIdx) {
         lastUiSceneIdx = info.index;
         document.getElementById("sceneCounterLabel").textContent =
-          `Сцена ${info.index + 1} из ${state.animEngine.scenes.length || 6}`;
+          `Сцена ${info.index + 1} из ${state.animEngine.scenes.length || 1}`;
+        let activeCard = null;
         document.querySelectorAll(".scene-card").forEach((c, idx) => {
-          c.classList.toggle("active", idx === info.index);
+          const isAct = idx === info.index;
+          c.classList.toggle("active", isAct);
+          if (isAct) activeCard = c;
         });
+        if (activeCard && document.getElementById("tab-animation")?.classList.contains("active")) {
+          activeCard.scrollIntoView({ block: "nearest", behavior: "smooth" });
+        }
       }
     };
 
@@ -2663,16 +2775,29 @@
 
     document.getElementById("btnDownloadSrt").addEventListener("click", () => {
       if (!state.pipelineResult) return;
+      const srcScenes =
+        state.animEngine?.isReady && Array.isArray(state.animEngine.scenes) && state.animEngine.scenes.length
+          ? state.animEngine.scenes
+          : state.pipelineResult.scenes;
       let elapsed = 0;
       const srtLines = [];
       let cueNum = 1;
-      state.pipelineResult.scenes.forEach((s) => {
+      srcScenes.forEach((s) => {
         const dur = s.durationSec || 10;
         const beats = Array.isArray(s.beats) && s.beats.length >= 2 ? s.beats : [{ text: s.caption }];
-        const step = dur / beats.length;
+        const preRoll = Math.min(dur * 0.12, s.preRollSec ?? 0.25);
+        const postRoll = Math.min(dur * 0.22, s.postRollSec ?? 1.25);
+        const speechDur = Math.max(2.0, dur - preRoll - postRoll);
+        let weights = Array.isArray(s.beatDurations) && s.beatDurations.length === beats.length
+          ? s.beatDurations.map((d) => Math.max(0.2, d))
+          : beats.map((b) => Math.max(12, String(b?.text || "").trim().length));
+        const totalW = weights.reduce((a, b) => a + b, 0) || 1;
+        let acc = preRoll;
         beats.forEach((b, bIdx) => {
-          const start = formatSrtTime(elapsed + bIdx * step);
-          const end = formatSrtTime(elapsed + (bIdx + 1) * step);
+          const sliceDur = speechDur * (weights[bIdx] / totalW);
+          const start = formatSrtTime(elapsed + acc);
+          acc += sliceDur;
+          const end = formatSrtTime(elapsed + acc);
           const txt = String(b?.text || "").replace(/\s+/g, " ").trim();
           if (txt) {
             srtLines.push(`${cueNum++}\n${start} --> ${end}\n${txt}\n`);

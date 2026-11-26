@@ -556,74 +556,81 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
       pitch = "",
       volume = ""
     } = opts;
-    const cacheKey = `edge::${locale}::${this.voiceGender}::${emotion}::${rate}::${pitch}::${cleanText}`;
+    const voiceGender = this.voiceGender || "female";
+    const cacheKey = `edge::${locale}::${voiceGender}::${emotion}::${rate}::${pitch}::${cleanText}`;
     const cachedBuf = this.audioBufferCache.get(cacheKey);
     if (cachedBuf) return cachedBuf;
 
-    if (this.pendingAudioFetches.has(cacheKey)) {
-      return this.pendingAudioFetches.get(cacheKey);
+    let pendingPromise = this.pendingAudioFetches.get(cacheKey);
+    if (!pendingPromise) {
+      pendingPromise = (async () => {
+        let lastErr = null;
+        for (let attempt = 0; attempt < maxAttempts; attempt++) {
+          const ctrl = new AbortController();
+          const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+          try {
+            const resp = await fetch("/api/tts", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                text: cleanText,
+                lang: locale,
+                emotion,
+                voiceGender,
+                rate,
+                pitch,
+                volume
+              }),
+              signal: ctrl.signal
+            });
+            clearTimeout(timer);
+            if (!resp.ok) {
+              throw new Error(`Edge TTS HTTP ${resp.status}`);
+            }
+            const arrayBuf = await resp.arrayBuffer();
+            if (!arrayBuf || arrayBuf.byteLength < 100) {
+              throw new Error("Empty Edge TTS audio");
+            }
+            const ctx = this.ensureAudioContext();
+            if (!ctx) throw new Error("Web Audio API unavailable");
+            const audioBuffer = await ctx.decodeAudioData(arrayBuf);
+            if (this.audioBufferCache.size >= 144) {
+              const firstKey = this.audioBufferCache.keys().next().value;
+              this.audioBufferCache.delete(firstKey);
+            }
+            this.audioBufferCache.set(cacheKey, audioBuffer);
+            return audioBuffer;
+          } catch (err) {
+            clearTimeout(timer);
+            lastErr = err;
+            if (attempt + 1 < maxAttempts) {
+              await new Promise((r) => setTimeout(r, 250));
+            }
+          }
+        }
+        throw lastErr || new Error("Edge TTS failed");
+      })().finally(() => {
+        this.pendingAudioFetches.delete(cacheKey);
+      });
+      this.pendingAudioFetches.set(cacheKey, pendingPromise);
     }
 
-    const promise = (async () => {
-      let lastErr = null;
-      for (let attempt = 0; attempt < maxAttempts; attempt++) {
-        if (externalSignal?.aborted) {
-          throw new DOMException("Aborted", "AbortError");
+    if (!externalSignal) return pendingPromise;
+    if (externalSignal.aborted) return Promise.reject(new DOMException("Aborted", "AbortError"));
+    return new Promise((resolve, reject) => {
+      const onAbort = () => reject(new DOMException("Aborted", "AbortError"));
+      externalSignal.addEventListener("abort", onAbort, { once: true });
+      pendingPromise.then(
+        (v) => {
+          externalSignal.removeEventListener("abort", onAbort);
+          resolve(v);
+        },
+        (e) => {
+          externalSignal.removeEventListener("abort", onAbort);
+          reject(e);
         }
-        const ctrl = new AbortController();
-        const timer = setTimeout(() => ctrl.abort(), timeoutMs);
-        const onExtAbort = () => ctrl.abort();
-        if (externalSignal) externalSignal.addEventListener("abort", onExtAbort, { once: true });
-        try {
-          const resp = await fetch("/api/tts", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              text: cleanText,
-              lang: locale,
-              emotion,
-              voiceGender: this.voiceGender,
-              rate,
-              pitch,
-              volume
-            }),
-            signal: ctrl.signal
-          });
-          clearTimeout(timer);
-          if (externalSignal) externalSignal.removeEventListener("abort", onExtAbort);
-          if (!resp.ok) {
-            throw new Error(`Edge TTS HTTP ${resp.status}`);
-          }
-          const arrayBuf = await resp.arrayBuffer();
-          if (!arrayBuf || arrayBuf.byteLength < 100) {
-            throw new Error("Empty Edge TTS audio");
-          }
-          const ctx = this.ensureAudioContext();
-          if (!ctx) throw new Error("Web Audio API unavailable");
-          const audioBuffer = await ctx.decodeAudioData(arrayBuf);
-          if (this.audioBufferCache.size >= 144) {
-            const firstKey = this.audioBufferCache.keys().next().value;
-            this.audioBufferCache.delete(firstKey);
-          }
-          this.audioBufferCache.set(cacheKey, audioBuffer);
-          return audioBuffer;
-        } catch (err) {
-          clearTimeout(timer);
-          if (externalSignal) externalSignal.removeEventListener("abort", onExtAbort);
-          if (externalSignal?.aborted) throw new DOMException("Aborted", "AbortError");
-          lastErr = err;
-          if (attempt + 1 < maxAttempts) {
-            await new Promise((r) => setTimeout(r, 250));
-          }
-        }
-      }
-      throw lastErr || new Error("Edge TTS failed");
-    })().finally(() => {
-      this.pendingAudioFetches.delete(cacheKey);
+      );
     });
-
-    this.pendingAudioFetches.set(cacheKey, promise);
-    return promise;
   }
 
   // Склейка 3 битов озвучки в единый бесшовный AudioBuffer с естественными интонационными паузами
@@ -665,20 +672,26 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
         "explain",
         sc.emotion === "celebrate" ? "celebrate" : sc.emotion === "risk" ? "risk" : "hook"
       ];
-      const beatTexts = beats.map((b) => this.prepareClausesForTts(b?.text, "").join(" ")).filter(Boolean);
-      if (beatTexts.length >= 2) {
+      const beatTexts = beats.map((b) => this.prepareClausesForTts(b?.text, "").join(" "));
+      if (beatTexts.some(Boolean)) {
+        const ctx = this.ensureAudioContext();
         const beatBufs = await Promise.all(
           beatTexts.map((bt, bIdx) =>
-            this.fetchEdgeTtsBuffer(bt, this.ttsLang, {
-              timeoutMs: 10000,
-              maxAttempts: 2,
-              externalSignal: abortSignal,
-              emotion: beatEmotions[bIdx] || "explain"
-            })
+            bt
+              ? this.fetchEdgeTtsBuffer(bt, this.ttsLang, {
+                  timeoutMs: 10000,
+                  maxAttempts: 2,
+                  externalSignal: abortSignal,
+                  emotion: beatEmotions[bIdx] || "explain"
+                })
+              : Promise.resolve(ctx ? ctx.createBuffer(1, Math.round(ctx.sampleRate * 0.35), ctx.sampleRate) : null)
           )
         );
-        sc.beatDurations = beatBufs.map((b) => +b.duration.toFixed(3));
-        finalBuf = this.stitchBeatAudioBuffers(beatBufs, 0.28);
+        const validBeatBufs = beatBufs.filter(Boolean);
+        if (validBeatBufs.length === beats.length) {
+          sc.beatDurations = validBeatBufs.map((b) => +b.duration.toFixed(3));
+          finalBuf = this.stitchBeatAudioBuffers(validBeatBufs, 0.28);
+        }
       }
     }
     if (!finalBuf) {
@@ -692,7 +705,7 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
     sc.audioBuffer = finalBuf;
     const baseDur = sc.baseDurationSec || sc.durationSec || 10;
     sc.speechDurationSec = +finalBuf.duration.toFixed(2);
-    sc.durationSec = +Math.max(baseDur, finalBuf.duration + 1.25).toFixed(2);
+    sc.durationSec = +Math.max(baseDur, 0.25 + finalBuf.duration + 1.25).toFixed(2);
     sc.finalCps = +(String(sc.caption || "").length / sc.durationSec).toFixed(1);
     return finalBuf;
   }
@@ -730,32 +743,42 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
     }
 
     this.ttsBackendMode = "neural_buffer";
-    for (let i = 0; i < total; i++) {
-      if (abortSignal?.aborted || myStreamId !== this.streamRunId) return;
-      const sc = list[i];
-      if (onProgress) {
-        onProgress({ readyCount: i, totalScenes: total, mode: "neural", sceneTitle: sc?.title || "", done: false });
-      }
-      try {
-        await this._synthesizeSingleSceneBuffer(sc, abortSignal);
-        consecutiveErrors = 0;
-        this.recalcTotalDuration();
-        // Если плеер уже играет именно эту сцену и звук ещё не запущен — мягко подхватываем буфер!
-        const curInfo = this.getCurrentSceneInfo();
-        if (this.isReady && this.isPlaying && this.ttsEnabled && curInfo.index === i && !this.audioPlaybackState.active) {
-          this.lastSpokenSceneIdx = -1;
-          this.checkTts(curInfo, curInfo.localTime);
+    let nextIdx = 0;
+    let readyCount = 0;
+    const concurrency = Math.min(3, total);
+    const runWorker = async () => {
+      while (nextIdx < total) {
+        if (abortSignal?.aborted || myStreamId !== this.streamRunId || !useNeuralServer) return;
+        const i = nextIdx++;
+        const sc = list[i];
+        try {
+          await this._synthesizeSingleSceneBuffer(sc, abortSignal);
+          consecutiveErrors = 0;
+          this.recalcTotalDuration();
+          const curInfo = this.getCurrentSceneInfo();
+          if (this.isReady && this.isPlaying && this.ttsEnabled && curInfo.index === i && !this.audioPlaybackState.active) {
+            this.lastSpokenSceneIdx = -1;
+            this.checkTts(curInfo, curInfo.localTime);
+          }
+        } catch (err) {
+          if (abortSignal?.aborted || myStreamId !== this.streamRunId) return;
+          consecutiveErrors++;
+          if (consecutiveErrors >= 2) {
+            useNeuralServer = false;
+            this.ttsBackendMode = "browser_speech";
+            return;
+          }
         }
-      } catch (err) {
-        if (abortSignal?.aborted || myStreamId !== this.streamRunId) return;
-        consecutiveErrors++;
-        if (consecutiveErrors >= 2) {
-          useNeuralServer = false;
-          this.ttsBackendMode = "browser_speech";
-          break;
+        readyCount++;
+        if (onProgress && myStreamId === this.streamRunId) {
+          onProgress({ readyCount, totalScenes: total, mode: "neural", sceneTitle: sc?.title || "", done: false });
         }
       }
+    };
+    if (onProgress) {
+      onProgress({ readyCount: 0, totalScenes: total, mode: "neural", sceneTitle: list[0]?.title || "", done: false });
     }
+    await Promise.all(Array.from({ length: concurrency }, () => runWorker()));
 
     if (onProgress && myStreamId === this.streamRunId) {
       onProgress({
@@ -784,38 +807,66 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
 
     let useNeuralServer = serverAlive;
     let consecutiveErrors = 0;
+    let doneCount = 0;
 
-    for (let i = 0; i < total; i++) {
-      if (abortSignal?.aborted) throw new DOMException("Cancelled", "AbortError");
-      const sc = list[i];
-      const cleanText = this.prepareClausesForTts(sc?.caption, sc?.title).join(" ");
-
+    if (useNeuralServer) {
       if (onProgress) {
         onProgress({
-          sceneIndex: i,
+          sceneIndex: 0,
           totalScenes: total,
-          doneCount: i,
-          sceneTitle: sc?.title || `Сцена ${i + 1}`,
-          mode: useNeuralServer ? "neural" : "offline"
+          doneCount: 0,
+          sceneTitle: list[0]?.title || "Сцена 1",
+          mode: "neural"
         });
       }
-
-      if (useNeuralServer && cleanText) {
-        try {
-          await this._synthesizeSingleSceneBuffer(sc, abortSignal);
-          consecutiveErrors = 0;
-        } catch (err) {
-          if (abortSignal?.aborted || (err?.name === "AbortError" && abortSignal?.aborted)) {
-            throw new DOMException("Cancelled", "AbortError");
+      let nextIdx = 0;
+      const concurrency = Math.min(3, total);
+      const runWorker = async () => {
+        while (nextIdx < total) {
+          if (abortSignal?.aborted) throw new DOMException("Cancelled", "AbortError");
+          const i = nextIdx++;
+          const sc = list[i];
+          const cleanText = this.prepareClausesForTts(sc?.caption, sc?.title).join(" ");
+          let synthOk = false;
+          if (useNeuralServer && cleanText) {
+            try {
+              await this._synthesizeSingleSceneBuffer(sc, abortSignal);
+              synthOk = Boolean(sc.audioBuffer);
+            } catch (err) {
+              if (abortSignal?.aborted || (err?.name === "AbortError" && abortSignal?.aborted)) {
+                throw new DOMException("Cancelled", "AbortError");
+              }
+              synthOk = false;
+            }
           }
-          consecutiveErrors++;
-          if (consecutiveErrors >= 2) {
-            useNeuralServer = false;
+          if (!synthOk) {
+            sc.audioBuffer = null;
+            sc.beatDurations = null;
+            const baseDur = sc.baseDurationSec || sc.durationSec || 10;
+            const estSpeech = Math.max(4, cleanText.length / 12.2);
+            sc.speechDurationSec = +estSpeech.toFixed(2);
+            sc.durationSec = +Math.max(baseDur, 0.25 + estSpeech + 1.25).toFixed(1);
+            sc.finalCps = +(String(sc.caption || "").length / sc.durationSec).toFixed(1);
+          }
+          doneCount++;
+          if (onProgress) {
+            onProgress({
+              sceneIndex: i,
+              totalScenes: total,
+              doneCount,
+              sceneTitle: sc?.title || `Сцена ${i + 1}`,
+              mode: synthOk ? "neural" : "offline"
+            });
           }
         }
-      }
-
-      if (!useNeuralServer) {
+      };
+      await Promise.all(Array.from({ length: concurrency }, () => runWorker()));
+      useNeuralServer = list.some((s) => Boolean(s.audioBuffer));
+    } else {
+      for (let i = 0; i < total; i++) {
+        if (abortSignal?.aborted) throw new DOMException("Cancelled", "AbortError");
+        const sc = list[i];
+        const cleanText = this.prepareClausesForTts(sc?.caption, sc?.title).join(" ");
         sc.audioBuffer = null;
         sc.beatDurations = null;
         const baseDur = sc.baseDurationSec || sc.durationSec || 10;
@@ -823,17 +874,15 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
         sc.speechDurationSec = +estSpeech.toFixed(2);
         sc.durationSec = +Math.max(baseDur, 0.7 + estSpeech + 1.3).toFixed(1);
         sc.finalCps = +(String(sc.caption || "").length / sc.durationSec).toFixed(1);
-        await new Promise((r) => setTimeout(r, 45));
-      }
-
-      if (onProgress) {
-        onProgress({
-          sceneIndex: i,
-          totalScenes: total,
-          doneCount: i + 1,
-          sceneTitle: sc?.title || `Сцена ${i + 1}`,
-          mode: useNeuralServer ? "neural" : "offline"
-        });
+        if (onProgress) {
+          onProgress({
+            sceneIndex: i,
+            totalScenes: total,
+            doneCount: i + 1,
+            sceneTitle: sc?.title || `Сцена ${i + 1}`,
+            mode: "offline"
+          });
+        }
       }
     }
 
@@ -884,7 +933,12 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
         await ctx.resume();
       } catch (_) {}
     }
-    if (runId !== this.ttsRunId || !this.ttsEnabled || !this.isPlaying || !this.isReady) return;
+    if (runId !== this.ttsRunId || !this.ttsEnabled || !this.isPlaying || !this.isReady) return false;
+    if (ctx.state === "suspended") {
+      this.audioPlaybackState = { active: false, loading: false, loadingSince: 0 };
+      this.lastSpokenSceneIdx = -1;
+      return false;
+    }
 
     if (this.activeSourceNode) {
       try {
@@ -925,11 +979,12 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
       source.connect(ctx.destination);
     }
 
+    const delaySec = sceneLocalTime < preRoll ? (preRoll - sceneLocalTime) / rate : 0;
     this.activeSourceNode = source;
     this.audioPlaybackState = { active: true, loading: false, loadingSince: 0 };
     this.audioSync = {
       sceneIndex,
-      startCtxTime: ctx.currentTime - audioOffset / rate,
+      startCtxTime: ctx.currentTime + delaySec - audioOffset / rate,
       speechDur: speechDuration,
       bufferDur: audioBuffer.duration,
       rate
@@ -944,7 +999,8 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
       }
     };
 
-    source.start(0, audioOffset);
+    source.start(ctx.currentTime + delaySec, audioOffset);
+    return true;
   }
 
   async playWithEdgeTtsServer(cleanText, locale, runId, sceneIndex = 0, emotion = "explain", offsetSec = 0) {
@@ -1036,33 +1092,44 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
   }
 
   getSceneTheme(scene) {
-    if (window.LectureVisualDirector) {
-      return window.LectureVisualDirector.getTheme(scene?.domainId);
+    const base = window.LectureVisualDirector
+      ? window.LectureVisualDirector.getTheme(scene?.domainId)
+      : {
+          domainId: scene?.domainId || "arch_eng",
+          bgTop: "#FAF9F5",
+          bgBottom: "#EFF3F8",
+          ambientA: "rgba(191, 219, 254, 0.40)",
+          ambientB: "rgba(254, 243, 199, 0.30)",
+          gridColor: "rgba(100, 116, 139, 0.12)",
+          surfaceTop: "rgba(255, 255, 255, 0.92)",
+          surfaceBottom: "rgba(248, 250, 252, 0.96)",
+          surfaceBorder: "rgba(148, 163, 184, 0.35)",
+          ink: "#18181B",
+          muted: "#475569",
+          primary: "#2563EB",
+          primarySoft: "rgba(37, 99, 235, 0.12)",
+          secondary: "#7C3AED",
+          success: "#059669",
+          danger: "#E11D48",
+          shadowRgb: "37, 99, 235",
+          cardPalettes: []
+        };
+    const sv = scene?.styleVariant;
+    if (!sv) return base;
+    const pals = Array.isArray(base.cardPalettes) ? base.cardPalettes : [];
+    const offset = pals.length ? ((sv.paletteOffset || 0) % pals.length) : 0;
+    const rotatedPals = offset ? [...pals.slice(offset), ...pals.slice(0, offset)] : pals;
+    const themed = { ...base, cardPalettes: rotatedPals };
+    if (sv.accentMode === "secondary" && base.secondary) {
+      themed.primary = base.secondary;
+      themed.secondary = base.primary;
+    } else if (sv.accentMode === "contrast" && rotatedPals[1]?.stroke) {
+      themed.primary = rotatedPals[1].stroke;
+    } else if (sv.accentMode === "neutral_ink" && base.secondary) {
+      themed.primary = base.ink;
+      themed.secondary = base.primary;
     }
-    return {
-      domainId: scene?.domainId || "arch_eng",
-      bgTop: "#FAF9F5",
-      bgBottom: "#EFF3F8",
-      ambientA: "rgba(191, 219, 254, 0.40)",
-      ambientB: "rgba(254, 243, 199, 0.30)",
-      gridColor: "rgba(100, 116, 139, 0.12)",
-      surfaceTop: "rgba(255, 255, 255, 0.92)",
-      surfaceBottom: "rgba(248, 250, 252, 0.94)",
-      surfaceBorder: "rgba(15, 23, 42, 0.08)",
-      shadowRgb: "29, 78, 216",
-      ink: "#18181B",
-      muted: "#52525B",
-      primary: "#1D4ED8",
-      primaryLight: "#3B82F6",
-      primarySoft: "rgba(29, 78, 216, 0.10)",
-      secondary: "#EA580C",
-      secondaryLight: "#FB923C",
-      secondarySoft: "rgba(234, 88, 12, 0.10)",
-      success: "#0F766E",
-      successSoft: "rgba(15, 118, 110, 0.10)",
-      danger: "#DC2626",
-      dangerSoft: "rgba(220, 38, 38, 0.09)"
-    };
+    return themed;
   }
 
   computeSceneBeatsTiming(scene, info) {
@@ -1091,8 +1158,12 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
     const preRoll = 0.25;
     const postRoll = 1.25;
     const hasAudio = Boolean(this.audioSync && this.audioSync.sceneIndex === info.index && this.audioPlaybackState.active);
-    const rate = hasAudio ? (this.audioSync.rate || 1.0) : (this.playbackSpeed || 1.0);
-    const speechDur = hasAudio ? Math.max(2, this.audioSync.speechDur) : Math.max(2, dur - preRoll - postRoll);
+    const rate = this.isExporting ? 1.0 : (hasAudio ? (this.audioSync.rate || 1.0) : (this.playbackSpeed || 1.0));
+    const speechDur = hasAudio
+      ? Math.max(2, this.audioSync.speechDur)
+      : (this.isExporting && scene?.speechDurationSec
+          ? Math.max(2, scene.speechDurationSec)
+          : Math.max(2, dur - preRoll - postRoll));
     const speechElapsed = hasAudio && this.audioCtx
       ? LectureAnimationEngine.clamp(this.audioCtx.currentTime - this.audioSync.startCtxTime, 0, speechDur)
       : LectureAnimationEngine.clamp(info.localTime - preRoll, 0, speechDur);
@@ -1192,6 +1263,48 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
     }
   }
 
+  getLayoutMetrics(scene, W, H) {
+    const mode = scene?.layoutMode || "split_tutor";
+    if (mode === "wide_stage") {
+      return {
+        mode,
+        stage: { x: 44, y: 158, w: W - 88, h: 394 },
+        backdropLeft: 36,
+        titleX: 112,
+        titleMaxW: W - 156,
+        tutor: { cx: 74, cy: 118, scale: 0.28, side: "left", mode: "corner_badge" }
+      };
+    }
+    if (mode === "hero_intro") {
+      return {
+        mode,
+        stage: { x: 256, y: 158, w: W - 292, h: 394 },
+        backdropLeft: 244,
+        titleX: 256,
+        titleMaxW: W - 296,
+        tutor: { cx: 140, cy: 365, scale: 0.78, side: "left", mode: "full" }
+      };
+    }
+    if (mode === "focus_split") {
+      return {
+        mode,
+        stage: { x: 36, y: 158, w: W - 354, h: 394 },
+        backdropLeft: 36,
+        titleX: 44,
+        titleMaxW: W - 360,
+        tutor: { cx: W - 162, cy: 355, scale: 1.0, side: "right", mode: "full" }
+      };
+    }
+    return {
+      mode: "split_tutor",
+      stage: { x: 318, y: 158, w: W - 354, h: 394 },
+      backdropLeft: 308,
+      titleX: 320,
+      titleMaxW: W - 360,
+      tutor: { cx: 162, cy: 355, scale: 1.0, side: "left", mode: "full" }
+    };
+  }
+
   // Главный рендер кадра (работает как на основном экране, так и на Offscreen Canvas при экспорте MP4/WebM)
   renderFrameOnContext(ctx, W, H, t) {
     const info = this.getSceneInfoAt(t);
@@ -1207,37 +1320,51 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
     const isReadingPause = p >= 0.80 || beats.speechElapsed >= beats.speechDur - 0.05;
     const motionAmp = 1 - LectureAnimationEngine.quinticSmooth((p - 0.72) / 0.12);
 
-    // 1. Светлый Editorial фон (Quiet Luxury) + чистая зона тьютора слева (DeafSpace)
-    this.drawKurzgesagtBackdrop(ctx, W, H, t, theme);
+    const layout = this.getLayoutMetrics(scene, W, H);
+    const STAGE = layout.stage;
+    if (this._lastLayoutMode && this._lastLayoutMode !== layout.mode) {
+      this._camState.x = STAGE.x + STAGE.w / 2;
+      this._camState.y = STAGE.y + STAGE.h / 2;
+    }
+    this._lastLayoutMode = layout.mode;
 
-    // 2. Верхний HUD-бар сцены
-    this.drawTopHud(ctx, W, info, scene, p, isReadingPause, theme);
+    // 1. Светлый Editorial фон (Quiet Luxury) + адаптивная чистая зона тьютора
+    this.drawKurzgesagtBackdrop(ctx, W, H, t, theme, layout, scene.styleVariant);
 
-    // 3. Основная сцена с настоящим Cross-Dissolve переходом (0.7с overlap)
-    const STAGE = { x: 318, y: 158, w: W - 354, h: 394 };
+    // 2. Верхний HUD-бар сцены + Mask-Reveal заголовка
+    this.drawTopHud(ctx, W, info, scene, p, isReadingPause, theme, layout);
+
+    // 3. Основная сцена с 4 типами переходов и жёстким Safe-Zone клиппингом [y: 80..596]
     const overlapSec = 0.7;
     const remainingSec = Math.max(0, dur - info.localTime);
     const nextScene = info.index + 1 < this.scenes.length ? this.scenes[info.index + 1] : null;
     const isTransitioningOut = Boolean(nextScene && remainingSec < overlapSec && dur > 2.5);
     const transU = isTransitioningOut ? LectureAnimationEngine.clamp(1 - remainingSec / overlapSec, 0, 1) : 0;
+    const transType = scene.transitionType || "cross_dissolve";
     const outAlpha = isTransitioningOut ? LectureAnimationEngine.quinticSmooth(1 - transU) : 1;
 
     // Виртуальная камера (Manim Rig): мягко приближается к активному узлу во время объяснения и отъезжает на паузе
     const activeCamZoom = isReadingPause ? 1.006 : 1.012 + Math.sin(beats.beatP * Math.PI) * 0.022;
-    const camZoom = activeCamZoom * (1 - transU * 0.014);
+    const camZoom = activeCamZoom * (1 - transU * (transType === "zoom_fade" ? 0.045 : 0.014));
     const stageCx = STAGE.x + STAGE.w / 2;
     const stageCy = STAGE.y + STAGE.h / 2;
     const panWeight = isReadingPause ? 0.015 : 0.035;
     const targetPanX = LectureAnimationEngine.clamp((stageCx - (this._camState.x || stageCx)) * panWeight, -18, 18);
     const targetPanY = LectureAnimationEngine.clamp((stageCy - (this._camState.y || stageCy)) * panWeight, -12, 12);
 
+    const outShiftX = transType === "slide" ? -transU * 96 : -transU * 18;
+    const SAFE_CLIP_H = H - 124 - 80; // Строго выше DHH-полосы субтитров (y: 80..596)
+
     ctx.save();
-    ctx.globalAlpha = outAlpha;
-    ctx.translate(stageCx + targetPanX - transU * 18, stageCy + targetPanY);
+    ctx.beginPath();
+    ctx.rect(0, 80, W, SAFE_CLIP_H);
+    ctx.clip();
+    ctx.globalAlpha = transType === "wipe" ? 1 : outAlpha;
+    ctx.translate(stageCx + targetPanX + outShiftX, stageCy + targetPanY);
     ctx.scale(camZoom, camZoom);
     ctx.translate(-stageCx, -stageCy);
 
-    const timing = { t, p, enterP, simP, isReadingPause, motionAmp, theme, beats };
+    const timing = { t, p, enterP, simP, isReadingPause, motionAmp, theme, beats, layout };
     const focalTarget = this.renderStageModule(ctx, STAGE, scene, timing);
     this._camState.x += (focalTarget.x - (this._camState.x || focalTarget.x)) * 0.12;
     this._camState.y += (focalTarget.y - (this._camState.y || focalTarget.y)) * 0.12;
@@ -1248,28 +1375,49 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
       y: stageCy + targetPanY + (focalTarget.y - stageCy) * camZoom
     };
 
-    // Входящая сцена в окне перекрытия (настоящий Cross-Dissolve без отката прогресса назад!)
-    if (isTransitioningOut && nextScene && transU > 0.15) {
-      const inAlpha = LectureAnimationEngine.quinticSmooth((transU - 0.15) / 0.85);
+    // Входящая сцена в окне перекрытия (Cross-Dissolve, Slide, Zoom-Fade, Wipe)
+    if (isTransitioningOut && nextScene && transU > 0.12) {
+      const inP = LectureAnimationEngine.quinticSmooth((transU - 0.12) / 0.88);
+      const nextLayout = this.getLayoutMetrics(nextScene, W, H);
+      const nextStage = nextLayout.stage;
       ctx.save();
-      ctx.globalAlpha = inAlpha;
-      ctx.translate((1 - inAlpha) * 18, 0);
+      ctx.beginPath();
+      if (transType === "wipe") {
+        ctx.rect(nextStage.x, 80, Math.max(1, nextStage.w * inP), SAFE_CLIP_H);
+      } else {
+        ctx.rect(0, 80, W, SAFE_CLIP_H);
+      }
+      ctx.clip();
+      ctx.globalAlpha = transType === "wipe" ? 1 : inP;
+      if (transType === "slide") {
+        ctx.translate((1 - inP) * 96, 0);
+      } else if (transType === "zoom_fade") {
+        const ncx = nextStage.x + nextStage.w / 2;
+        const ncy = nextStage.y + nextStage.h / 2;
+        const z = 0.94 + 0.06 * inP;
+        ctx.translate(ncx, ncy);
+        ctx.scale(z, z);
+        ctx.translate(-ncx, -ncy);
+      } else if (transType === "cross_dissolve") {
+        ctx.translate((1 - inP) * 18, 0);
+      }
       const nextTiming = {
         t,
-        p: 0,
-        enterP: inAlpha * 0.45,
+        p: Math.min(0.14, inP * 0.14),
+        enterP: Math.min(1, inP * 0.6),
         simP: 0,
         isReadingPause: false,
         motionAmp: 1,
         theme: this.getSceneTheme(nextScene),
-        beats: { beats: nextScene.beats || [], activeBeatIdx: 0, beatP: 0, beatEase: inAlpha * 0.5, beatStates: [0, 0, 0] }
+        beats: { beats: nextScene.beats || [], activeBeatIdx: 0, beatP: inP * 0.25, beatEase: inP * 0.5, beatStates: [0, 0, 0] },
+        layout: nextLayout
       };
-      this.renderStageModule(ctx, STAGE, nextScene, nextTiming);
+      this.renderStageModule(ctx, nextStage, nextScene, nextTiming);
       ctx.restore();
     }
 
-    // 4. Левая зона: Процедурный 2D-персонаж в стиле Duolingo/Rive (непрерывный между сценами!)
-    this.drawProceduralTutor(ctx, 162, 355, t, scene, screenFocalTarget, isReadingPause, beats);
+    // 4. Процедурный 2D-персонаж в стиле Duolingo/Rive (позиция и размер адаптируются под layoutMode)
+    this.drawProceduralTutor(ctx, layout.tutor.cx, layout.tutor.cy, t, scene, screenFocalTarget, isReadingPause, beats, layout.tutor);
 
     // 5. Режим дефекта ИЛИ светлые контрастные DHH-субтитры с караоке
     if (this.showRawDefectMode) {
@@ -1280,11 +1428,11 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
   }
 
   // Слой 0 и 1: Кэшированный Светлый Editorial фон + живые частицы (0 лишних аллокаций в 60 FPS)
-  drawKurzgesagtBackdrop(ctx, W, H, t, themeOrDomain) {
+  drawKurzgesagtBackdrop(ctx, W, H, t, themeOrDomain, layout = null, styleVariant = null) {
     const theme = typeof themeOrDomain === "object" ? themeOrDomain : this.getSceneTheme({ domainId: themeOrDomain });
-    const stageLeft = 308;
-    const pType = theme.patternType || "editorial";
-    const cacheKey = `${theme.domainId || "default"}:${pType}:${W}x${H}`;
+    const stageLeft = layout?.backdropLeft ?? 308;
+    const pType = styleVariant?.patternVariant || theme.patternType || "editorial";
+    const cacheKey = `${theme.domainId || "default"}:${pType}:${layout?.mode || "split_tutor"}:${styleVariant?.accentMode || "primary"}:${W}x${H}`;
 
     let cachedBg = this._backdropCache.get(cacheKey);
     if (!cachedBg && typeof document !== "undefined" && typeof document.createElement === "function") {
@@ -1329,8 +1477,9 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
             octx.lineTo(W - 28, y);
             octx.stroke();
           }
-        } else if (pType === "editorial") {
-          for (let x = stageLeft + 40; x < W - 40; x += 180) {
+        } else if (pType === "editorial" || pType === "archival_columns") {
+          const stepCol = pType === "archival_columns" ? 132 : 180;
+          for (let x = stageLeft + 40; x < W - 40; x += stepCol) {
             octx.beginPath();
             octx.moveTo(x, 86);
             octx.lineTo(x, H - 136);
@@ -1466,7 +1615,7 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
   }
 
   // Верхний HUD-бар с индикатором домена, источника, сцены и фазы Moving Hold
-  drawTopHud(ctx, W, info, scene, p, isPause, themeObj) {
+  drawTopHud(ctx, W, info, scene, p, isPause, themeObj, layout = null) {
     const theme = themeObj || this.getSceneTheme(scene);
     const ui = this.getCanvasUiLabels(scene);
     const hudX = 36;
@@ -1487,10 +1636,19 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
       680
     );
 
-    // Заголовок сцены
+    // Заголовок сцены с Mask-Reveal анимацией в первые 0.65с
+    const titleX = layout?.titleX ?? 320;
+    const titleMaxW = layout?.titleMaxW ?? (W - 360);
+    const dur = scene.durationSec || 12;
+    const revealP = LectureAnimationEngine.quinticSmooth((p * dur) / 0.65);
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(titleX - 4, 88, Math.max(8, (titleMaxW + 8) * revealP), 52);
+    ctx.clip();
     ctx.fillStyle = theme.ink;
     ctx.font = "800 23.5px 'Manrope', 'Inter', sans-serif";
-    ctx.fillText(scene.title, 320, 124, W - 360);
+    ctx.fillText(scene.title, titleX, 124 + (1 - revealP) * 14, titleMaxW);
+    ctx.restore();
 
     // Справа в HUD — индикатор фазы
     ctx.textAlign = "right";
@@ -1726,7 +1884,7 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
     const stages = scene.visualPayload?.stages || [];
     const tiers = [0, 1, 2].map((i) => stages[i] || { shortTitle: `Уровень ${i + 1}`, detail: "", metric: `0${i + 1}` });
 
-    const pyrCx = stage.x + stage.w * 0.36;
+    const pyrCx = stage.x + Math.round(stage.w * 0.30);
     const topY = stage.y + 44;
     const tierH = 96;
     const gap = 14;
@@ -1736,8 +1894,8 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
       const pop = LectureAnimationEngine.stagger(p, i, 3, 0.12, 0.35);
       const rowFromTop = 2 - i;
       const y = topY + rowFromTop * (tierH + gap);
-      const topW = (160 + rowFromTop * 115) * Math.min(1, pop);
-      const botW = (240 + rowFromTop * 115) * Math.min(1, pop);
+      const topW = (Math.round(stage.w * 0.15) + rowFromTop * Math.round(stage.w * 0.10)) * Math.min(1, pop);
+      const botW = (Math.round(stage.w * 0.22) + rowFromTop * Math.round(stage.w * 0.10)) * Math.min(1, pop);
       const isFocus = i === activeBeat;
       const shiftX = isFocus ? beatEase * 14 : 0;
       const pal = pals[i % Math.max(1, pals.length)] || { top: "#EFF6FF", bot: "#DBEAFE", stroke: theme.primary, text: theme.ink };
@@ -2592,9 +2750,11 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
 
     if (mode === "comparative_bars") {
       // Горизонтальная структурная диаграмма вклада факторов (для социологии, права, истории — никакого резонанса!)
+      const lang = scene.outputLang || "ru";
+      const chartTitle = lang === "kk" ? "НЕГІЗГІ ФАКТОРЛАР ҚҰРЫЛЫМЫ" : lang === "en" ? "KEY FACTOR STRUCTURE" : "СТРУКТУРА КЛЮЧЕВЫХ ФАКТОРОВ ТЕМЫ";
       ctx.fillStyle = theme.primary;
       ctx.font = "800 12px 'JetBrains Mono', monospace";
-      ctx.fillText("СТРУКТУРА КЛЮЧЕВЫХ ФАКТОРОВ ТЕМЫ", gx, gy - 14);
+      ctx.fillText(chartTitle, gx, gy - 14);
       const weights = [0.92, 0.76, 0.64, 0.84];
       const pals = theme.cardPalettes || [];
       for (let i = 0; i < Math.min(4, Math.max(3, stages.length)); i++) {
@@ -2636,16 +2796,49 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
         ctx.stroke();
       };
 
+      const drawAreaFill = (fnA, fnB, fillCol, maxU) => {
+        ctx.save();
+        ctx.fillStyle = fillCol;
+        ctx.beginPath();
+        for (let i = 0; i <= 40; i++) {
+          const u = (i / 40) * maxU;
+          const x = gx + u * gw;
+          const y = gy + gh - LectureAnimationEngine.clamp(fnA(u), 0.05, 0.95) * (gh - 24);
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        for (let i = 40; i >= 0; i--) {
+          const u = (i / 40) * maxU;
+          const x = gx + u * gw;
+          const y = gy + gh - LectureAnimationEngine.clamp(fnB(u), 0.05, 0.95) * (gh - 24);
+          ctx.lineTo(x, y);
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      };
+
       const curU = LectureAnimationEngine.clamp(0.15 + p * 0.82, 0.15, 0.96);
+      const act2P = LectureAnimationEngine.clamp((p - 0.25) / 0.35, 0, 1);
       if (mode === "supply_demand_cross") {
+        if (act2P > 0.1) drawAreaFill((u) => 0.85 - u * 0.68, (u) => 0.15 + u * 0.72, "rgba(79, 70, 229, 0.10)", curU * act2P);
         drawFn((u) => 0.85 - u * 0.68, theme.secondary, curU);
-        drawFn((u) => 0.15 + u * 0.72, theme.primary, curU);
+        if (act2P > 0.05) drawFn((u) => 0.15 + u * 0.72, theme.primary, curU * act2P);
       } else if (mode === "resonance_wave") {
+        if (act2P > 0.1) drawAreaFill((u) => Math.exp(-Math.pow((u - 0.52) * 4.2, 2)) * 0.86 + 0.1, (u) => Math.exp(-Math.pow((u - 0.52) * 2.2, 2)) * 0.28 + 0.1, "rgba(239, 68, 68, 0.12)", curU * act2P);
         drawFn((u) => Math.exp(-Math.pow((u - 0.52) * 4.2, 2)) * 0.86 + 0.1, theme.danger, curU);
-        drawFn((u) => Math.exp(-Math.pow((u - 0.52) * 2.2, 2)) * 0.28 + 0.1, theme.success, curU);
+        if (act2P > 0.05) drawFn((u) => Math.exp(-Math.pow((u - 0.52) * 2.2, 2)) * 0.28 + 0.1, theme.success, curU * act2P);
       } else {
-        // Плавная логистическая S-кривая роста и насыщения (AI / Биология / Инженерия)
+        if (act2P > 0.1) drawAreaFill((u) => 1 / (1 + Math.exp(-(u - 0.45) * 8)), () => 0.08, theme.primarySoft || "rgba(79, 70, 229, 0.12)", curU * act2P);
         drawFn((u) => 1 / (1 + Math.exp(-(u - 0.45) * 8)), theme.primary, curU);
+      }
+      if (p > 0.62) {
+        const dotX = gx + 0.52 * gw;
+        const dotY = gy + gh - 0.62 * (gh - 24);
+        ctx.fillStyle = theme.primary;
+        ctx.beginPath();
+        ctx.arc(dotX, dotY, 6, 0, Math.PI * 2);
+        ctx.fill();
       }
     }
 
@@ -2657,9 +2850,10 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
       bottom: "#F8FAFC",
       rim: theme.primary
     }, 16);
+    const ruleHdr = scene.outputLang === "kk" ? "ЕРЕЖЕ / ФОРМУЛА" : scene.outputLang === "en" ? "CORE RULE / FORMULA" : "ФОРМУЛА / ПРАВИЛО";
     ctx.fillStyle = theme.primary;
     ctx.font = "800 11.5px 'JetBrains Mono', monospace";
-    ctx.fillText("ФОРМУЛА / RULE", rx + 18, gy + 18);
+    ctx.fillText(ruleHdr, rx + 18, gy + 18);
     ctx.fillStyle = theme.ink;
     ctx.font = "800 16px 'Manrope', sans-serif";
     this.wrapText(ctx, this.formatMathText(sig.formulaCard?.expression || scene.keyTerm), rx + 18, gy + 48, rw - 36, 22, 2);
@@ -3581,36 +3775,41 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
   // =========================================================================
   drawHeroProblemHook(ctx, stage, scene, timing) {
     const { t, enterP, motionAmp } = timing;
-    const { domainProfile, signals } = scene.visualPayload;
+    const theme = timing.theme || this.getSceneTheme(scene);
+    const domainProfile = scene.visualPayload?.domainProfile || { heroLabel: scene.sectionRef || "Ключевой вызов" };
+    const signals = scene.visualPayload?.signals || { dangerMetric: { label: "Риск", value: "Высокий" } };
+    const dangerLabel = signals?.dangerMetric?.label || "Фактор риска";
+    const dangerValue = signals?.dangerMetric?.value || "Критично";
 
-    this.drawKurzgesagtCapsule(ctx, stage.x, stage.y, stage.w, stage.h, {
-      top: "rgba(15, 23, 42, 0.78)",
-      bottom: "rgba(9, 13, 22, 0.9)",
-      rim: "rgba(244, 63, 94, 0.4)"
-    }, 18);
+    if (!scene.styleVariant?.frameless) {
+      this.drawKurzgesagtCapsule(ctx, stage.x, stage.y, stage.w, stage.h, {
+        top: theme.surfaceTop,
+        bottom: theme.surfaceBottom,
+        rim: theme.surfaceBorder
+      }, 22, `rgba(${theme.shadowRgb}, 0.08)`);
+    }
 
-    const cx = stage.x + 280;
+    const cx = stage.x + Math.round(stage.w * 0.28);
     const cy = stage.y + 195;
 
     // 1. Волны ударного воздействия слева
     for (let wIdx = 0; wIdx < 3; wIdx++) {
       const wavePhase = ((t * 1.4 + wIdx * 0.33) % 1);
-      const wx = stage.x + 40 + wavePhase * 155;
-      const alpha = (1 - wavePhase) * 0.75 * enterP;
-      ctx.strokeStyle = `rgba(244, 63, 94, ${alpha.toFixed(2)})`;
-      ctx.lineWidth = 3.5;
+      const wx = stage.x + 40 + wavePhase * 135;
+      const alpha = (1 - wavePhase) * 0.65 * enterP;
+      ctx.strokeStyle = `rgba(225, 29, 72, ${alpha.toFixed(2)})`;
+      ctx.lineWidth = 3;
       ctx.beginPath();
-      ctx.arc(wx - 40, cy, 45 + wIdx * 18, -0.55, 0.55);
+      ctx.arc(wx - 24, cy, 40 + wIdx * 16, -0.55, 0.55);
       ctx.stroke();
     }
 
     // 2. Центральный параметрический объект дисциплины под нагрузкой
     if (scene.domainId === "arch_eng") {
-      // 4-этажный каркас здания, раскачивающийся с фазовым сдвигом по высоте
       const baseW = 140;
       const floorH = 44;
       const groundY = cy + 90;
-      ctx.fillStyle = "#334155";
+      ctx.fillStyle = theme.muted;
       this.roundRect(ctx, cx - 95, groundY, 190, 14, 6);
       ctx.fill();
 
@@ -3619,64 +3818,63 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
         const fy = groundY - (f + 1) * floorH;
         const fx = cx - baseW / 2 + sway;
         this.drawKurzgesagtCapsule(ctx, fx, fy, baseW, floorH - 5, {
-          top: f === 0 ? "#ef4444" : "#3b82f6",
-          bottom: f === 0 ? "#991b1b" : "#1d4ed8",
-          rim: "#93c5fd"
-        }, 8, f === 0 ? "rgba(239, 68, 68, 0.5)" : null);
+          top: f === 0 ? "#FEE2E2" : "#DBEAFE",
+          bottom: f === 0 ? "#FECACA" : "#BFDBFE",
+          rim: f === 0 ? theme.danger : theme.primary
+        }, 8, f === 0 ? "rgba(239, 68, 68, 0.25)" : null);
 
-        // Окна этажа
-        ctx.fillStyle = "rgba(254, 240, 138, 0.85)";
+        ctx.fillStyle = f === 0 ? "#991B1B" : "#1E40AF";
         for (let k = 0; k < 3; k++) {
           ctx.fillRect(fx + 18 + k * 38, fy + 11, 22, 16);
         }
       }
     } else if (scene.domainId === "biz_econ") {
-      // Финансовый резервуар стартапа с утечкой CAC > LTV
       this.drawKurzgesagtCapsule(ctx, cx - 75, cy - 85, 150, 170, {
-        top: "#1e293b",
-        bottom: "#0f172a",
-        rim: "#f43f5e"
+        top: "#F8FAFC",
+        bottom: "#F1F5F9",
+        rim: theme.danger
       }, 20);
       const levelH = 95 - Math.sin(t * 3) * 18 * motionAmp;
       this.drawKurzgesagtCapsule(ctx, cx - 67, cy + 77 - levelH, 134, levelH, {
-        top: "#f43f5e",
-        bottom: "#9f1239",
-        rim: "#fda4af"
+        top: "#FFE4E6",
+        bottom: "#FECDD3",
+        rim: "#F43F5E"
       }, 14);
-      ctx.fillStyle = "#ffffff";
-      ctx.font = "800 20px 'JetBrains Mono', monospace";
-      ctx.fillText("CAC > LTV", cx - 52, cy + 5);
+      ctx.fillStyle = "#9F1239";
+      ctx.font = "800 18px 'JetBrains Mono', monospace";
+      ctx.fillText("CAC > LTV", cx - 50, cy + 5);
     } else {
-      // Нейронное ядро с пульсирующими красными «галлюцинациями» без RAG
       for (let i = 0; i < 6; i++) {
         const ang = (i * Math.PI) / 3 + t * 1.2 * motionAmp;
         const nx = cx + Math.cos(ang) * 76;
         const ny = cy + Math.sin(ang) * 68;
-        ctx.strokeStyle = "rgba(244, 63, 94, 0.55)";
+        ctx.strokeStyle = "rgba(225, 29, 72, 0.35)";
         ctx.lineWidth = 2.5;
         ctx.beginPath();
         ctx.moveTo(cx, cy);
         ctx.lineTo(nx, ny);
         ctx.stroke();
         this.drawKurzgesagtCapsule(ctx, nx - 28, ny - 16, 56, 32, {
-          top: i % 2 === 0 ? "#ef4444" : "#6366f1",
-          bottom: "#1e1b4b",
-          rim: "#fda4af"
+          top: i % 2 === 0 ? "#FFE4E6" : "#EEF2FF",
+          bottom: i % 2 === 0 ? "#FECDD3" : "#E0E7FF",
+          rim: i % 2 === 0 ? theme.danger : theme.primary
         }, 10);
       }
       this.drawKurzgesagtCapsule(ctx, cx - 44, cy - 44, 88, 88, {
-        top: "#7c3aed",
-        bottom: "#3b0764",
-        rim: "#d8b4fe"
-      }, 44, "rgba(168, 85, 247, 0.5)");
-      ctx.fillStyle = "#ffffff";
-      ctx.font = "800 18px 'JetBrains Mono', monospace";
-      ctx.fillText("LLM ?", cx - 26, cy + 6);
+        top: theme.primarySoft || "#EEF2FF",
+        bottom: "#FFFFFF",
+        rim: theme.primary
+      }, 44, `rgba(${theme.shadowRgb}, 0.16)`);
+      ctx.fillStyle = theme.ink;
+      ctx.font = "800 17px 'JetBrains Mono', monospace";
+      ctx.textAlign = "center";
+      ctx.fillText("ФОКУС", cx, cy + 6);
+      ctx.textAlign = "left";
     }
 
     // 3. Правая панель: Датчик критической метрики + карточка ключевого термина
-    const rightX = stage.x + 455;
-    const rightW = stage.w - 480;
+    const rightX = stage.x + Math.round(stage.w * 0.49);
+    const rightW = stage.w - Math.round(stage.w * 0.49) - 24;
 
     const s1 = LectureAnimationEngine.stagger(timing.p, 0, 3);
     if (s1 > 0.05) {
@@ -3689,13 +3887,13 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
       }, 14);
       ctx.fillStyle = "#BE123C";
       ctx.font = "800 12.5px 'JetBrains Mono', monospace";
-      ctx.fillText(`⚠ КРИТИЧЕСКИЙ ФАКТОР · ${signals.dangerMetric.label.toUpperCase()}`, rightX + 18, stage.y + 52, rightW - 36);
+      ctx.fillText(`⚠ КРИТИЧЕСКИЙ ФАКТОР · ${String(dangerLabel).toUpperCase()}`, rightX + 18, stage.y + 52, rightW - 36);
       ctx.fillStyle = "#881337";
-      ctx.font = "900 30px 'Manrope', sans-serif";
-      ctx.fillText(signals.dangerMetric.value, rightX + 18, stage.y + 92, rightW - 36);
+      ctx.font = "900 28px 'Manrope', sans-serif";
+      ctx.fillText(dangerValue, rightX + 18, stage.y + 92, rightW - 36);
       ctx.fillStyle = "#475569";
       ctx.font = "600 14px 'Inter', sans-serif";
-      ctx.fillText(domainProfile.heroLabel, rightX + 18, stage.y + 122, rightW - 36);
+      ctx.fillText(domainProfile.heroLabel || scene.sectionRef || "", rightX + 18, stage.y + 122, rightW - 36);
       ctx.restore();
     }
 
@@ -3708,9 +3906,10 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
         bottom: "#DBEAFE",
         rim: "#2563EB"
       }, 14);
+      const termHdr = scene.outputLang === "kk" ? "НЕГІЗГІ ҰҒЫМ:" : scene.outputLang === "en" ? "KEY CONCEPT:" : "КЛЮЧЕВОЙ ТЕРМИН:";
       ctx.fillStyle = "#1D4ED8";
       ctx.font = "800 13.5px 'JetBrains Mono', monospace";
-      ctx.fillText(`КЛЮЧЕВОЙ ТЕРМИН СИЛЛАБУСА:`, rightX + 20, stage.y + 192);
+      ctx.fillText(termHdr, rightX + 20, stage.y + 192);
       ctx.fillStyle = "#0F172A";
       ctx.font = "800 21px 'Manrope', sans-serif";
       ctx.fillText(scene.keyTerm, rightX + 20, stage.y + 222, rightW - 36);
@@ -3728,16 +3927,19 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
   // =========================================================================
   drawPipelineEnergyFlow(ctx, stage, scene, timing) {
     const { t, p, simP } = timing;
-    const stages = scene.visualPayload.stages || [];
+    const theme = timing.theme || this.getSceneTheme(scene);
+    const stages = scene.visualPayload?.stages || [];
 
-    this.drawKurzgesagtCapsule(ctx, stage.x, stage.y, stage.w, stage.h, {
-      top: "rgba(15, 23, 42, 0.8)",
-      bottom: "rgba(9, 13, 22, 0.92)",
-      rim: "rgba(56, 189, 248, 0.35)"
-    }, 18);
+    if (!scene.styleVariant?.frameless) {
+      this.drawKurzgesagtCapsule(ctx, stage.x, stage.y, stage.w, stage.h, {
+        top: theme.surfaceTop,
+        bottom: theme.surfaceBottom,
+        rim: theme.surfaceBorder
+      }, 22, `rgba(${theme.shadowRgb}, 0.08)`);
+    }
 
     const count = Math.min(4, Math.max(3, stages.length));
-    const cardW = 192;
+    const cardW = Math.min(220, Math.floor((stage.w - 90) / count));
     const cardH = 148;
     const stepX = (stage.w - 70 - cardW) / Math.max(1, count - 1);
 
@@ -3748,27 +3950,27 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
       centers.push({ x: cx, y: cy });
     }
 
-    // 1. Саморисующиеся кривые Безье + бегущие световые сгустки энергии
+    // 1. Саморисующиеся кривые Безье + бегущие импульсы
     for (let i = 0; i < centers.length - 1; i++) {
       const p0 = centers[i];
       const p2 = centers[i + 1];
       const cp = { x: (p0.x + p2.x) / 2, y: i % 2 === 0 ? p0.y - 30 : p0.y + 30 };
       const lineP = LectureAnimationEngine.clamp((simP - i * 0.22) * 2.2, 0, 1);
 
-      this.drawTrimmedBezier(ctx, p0, cp, p2, lineP, "#38bdf8", 4);
+      this.drawTrimmedBezier(ctx, p0, cp, p2, lineP, theme.primary, 4);
       if (lineP > 0.4) {
         const pulseT = ((t * 0.9 + i * 0.35) % 1);
-        this.drawBezierPulse(ctx, p0, cp, p2, pulseT, "#fde047");
+        this.drawBezierPulse(ctx, p0, cp, p2, pulseT, theme.secondary);
       }
     }
 
-    // 2. Каскадные капсулы этапов с пружинной физикой и живым «дыханием»
+    // 2. Каскадные капсулы этапов в светлой палитре Quiet Luxury
     const activeIdx = Math.min(count - 1, Math.floor(simP * count));
-    const palettes = [
-      { top: "#2563eb", bottom: "#1e3a8a", rim: "#93c5fd" },
-      { top: "#7c3aed", bottom: "#4c1d95", rim: "#d8b4fe" },
-      { top: "#0891b2", bottom: "#164e63", rim: "#67e8f9" },
-      { top: "#059669", bottom: "#064e3b", rim: "#6ee7b7" }
+    const pals = theme.cardPalettes || [
+      { top: "#EFF6FF", bot: "#DBEAFE", stroke: "#2563EB", text: "#1E3A8A" },
+      { top: "#F5F3FF", bot: "#EDE9FE", stroke: "#7C3AED", text: "#4C1D95" },
+      { top: "#ECFEFF", bot: "#CFFAFE", stroke: "#0891B2", text: "#155E75" },
+      { top: "#ECFDF5", bot: "#D1FAE5", stroke: "#059669", text: "#065F46" }
     ];
 
     centers.forEach((c, idx) => {
@@ -3783,6 +3985,7 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
       const h = cardH * scale;
       const x = c.x - w / 2;
       const y = c.y - h / 2 + breathY;
+      const pal = pals[idx % pals.length];
 
       this.drawKurzgesagtCapsule(
         ctx,
@@ -3790,21 +3993,21 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
         y,
         w,
         h,
-        palettes[idx % palettes.length],
+        { top: pal.top, bottom: pal.bot, rim: isCurrent ? theme.primary : pal.stroke },
         16,
-        isCurrent ? "rgba(56, 189, 248, 0.55)" : null
+        isCurrent ? `rgba(${theme.shadowRgb}, 0.16)` : null
       );
 
       if (pop > 0.45) {
-        ctx.fillStyle = "#fde047";
+        ctx.fillStyle = pal.stroke;
         ctx.font = "800 12px 'JetBrains Mono', monospace";
-        ctx.fillText(`ШАГ 0${idx + 1} · ${st.metric}`, x + 16, y + 28);
+        ctx.fillText(`ШАГ 0${idx + 1} · ${st.metric || ""}`, x + 16, y + 28, w - 28);
 
-        ctx.fillStyle = "#ffffff";
-        ctx.font = "800 18px 'Manrope', sans-serif";
+        ctx.fillStyle = theme.ink;
+        ctx.font = "800 17px 'Manrope', sans-serif";
         ctx.fillText(st.shortTitle, x + 16, y + 54, w - 28);
 
-        ctx.fillStyle = "#e2e8f0";
+        ctx.fillStyle = theme.muted;
         ctx.font = "500 13.5px 'Inter', sans-serif";
         this.wrapText(ctx, st.detail, x + 16, y + 78, w - 28, 18, 3);
       }
@@ -3814,288 +4017,27 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
   }
 
   // =========================================================================
-  // АРХЕТИП 3: SPLIT COMPARISON (Контраст «БЕЗ МЕТОДА ❌ vs С МЕТОДОМ ✅»)
-  // =========================================================================
-  drawSplitComparison(ctx, stage, scene, timing) {
-    const { t, p, motionAmp } = timing;
-    const cmp = scene.visualPayload?.facts?.comparison;
-    const sig = scene.visualPayload?.signals;
-    const leftTitle = cmp ? cmp.leftTitle : sig.leftFail.title;
-    const leftSub = cmp ? cmp.leftNote : sig.leftFail.sub;
-    const leftMetric = cmp ? cmp.leftMetric : sig.leftFail.metric;
-    const rightTitle = cmp ? cmp.rightTitle : sig.rightPass.title;
-    const rightSub = cmp ? cmp.rightNote : sig.rightPass.sub;
-    const rightMetric = cmp ? cmp.rightMetric : sig.rightPass.metric;
-    const deltaBadge = cmp ? cmp.deltaBadge : sig.deltaBadge;
-
-    const halfW = (stage.w - 28) / 2;
-    const leftX = stage.x;
-    const rightX = stage.x + halfW + 28;
-
-    // 1. Левая карточка: БЕЗ МЕТОДА (Авария / Ошибка)
-    const sLeft = LectureAnimationEngine.stagger(p, 0, 3);
-    ctx.save();
-    ctx.globalAlpha = Math.min(1, sLeft);
-    this.drawKurzgesagtCapsule(ctx, leftX, stage.y, halfW, stage.h, {
-      top: "#FFF1F2",
-      bottom: "#FFE4E6",
-      rim: "#FB7185"
-    }, 18);
-
-    ctx.fillStyle = "#9F1239";
-    ctx.font = "900 18px 'Manrope', sans-serif";
-    ctx.fillText(leftTitle, leftX + 24, stage.y + 38, halfW - 48);
-    ctx.fillStyle = "#475569";
-    ctx.font = "600 14px 'Inter', sans-serif";
-    ctx.fillText(leftSub, leftX + 24, stage.y + 62, halfW - 48);
-
-    // Мини-симуляция хаоса/тряски слева
-    const lCx = leftX + halfW / 2;
-    const lCy = stage.y + 195;
-    for (let k = 0; k < 3; k++) {
-      const shakeX = Math.sin(t * 11 + k * 2) * 14 * motionAmp;
-      this.drawKurzgesagtCapsule(ctx, lCx - 75 + shakeX, lCy - 55 + k * 42, 150, 34, {
-        top: "#e11d48",
-        bottom: "#881337",
-        rim: "#fda4af"
-      }, 10);
-    }
-
-    // Плашка метрики отказа внизу слева
-    this.drawKurzgesagtCapsule(ctx, leftX + 24, stage.y + stage.h - 68, halfW - 48, 46, {
-      top: "#9f1239",
-      bottom: "#4c0519",
-      rim: "#fb7185"
-    }, 10);
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "800 15px 'JetBrains Mono', monospace";
-    ctx.fillText(`⚠ ${leftMetric}`, leftX + 40, stage.y + stage.h - 40, halfW - 80);
-    ctx.restore();
-
-    // 2. Правая карточка: С МЕТОДОМ (Стабилизация / Защита)
-    const sRight = LectureAnimationEngine.stagger(p, 1, 3);
-    ctx.save();
-    ctx.globalAlpha = Math.min(1, sRight);
-    this.drawKurzgesagtCapsule(ctx, rightX, stage.y, halfW, stage.h, {
-      top: "#ECFDF5",
-      bottom: "#D1FAE5",
-      rim: "#10B981"
-    }, 18, "rgba(16, 185, 129, 0.16)");
-
-    ctx.fillStyle = "#065F46";
-    ctx.font = "900 18px 'Manrope', sans-serif";
-    ctx.fillText(rightTitle, rightX + 24, stage.y + 38, halfW - 48);
-    ctx.fillStyle = "#475569";
-    ctx.font = "600 14px 'Inter', sans-serif";
-    ctx.fillText(rightSub, rightX + 24, stage.y + 62, halfW - 48);
-
-    // Мини-симуляция стабильной системы справа (плавное дыхание на демпферах)
-    const rCx = rightX + halfW / 2;
-    const rCy = stage.y + 195;
-    const smoothGlide = Math.sin(t * 2.2) * 3;
-    for (let k = 0; k < 3; k++) {
-      this.drawKurzgesagtCapsule(ctx, rCx - 75 + smoothGlide, rCy - 55 + k * 42, 150, 34, {
-        top: "#059669",
-        bottom: "#064e3b",
-        rim: "#6ee7b7"
-      }, 10);
-    }
-
-    this.drawKurzgesagtCapsule(ctx, rightX + 24, stage.y + stage.h - 68, halfW - 48, 46, {
-      top: "#047857",
-      bottom: "#064e3b",
-      rim: "#34d399"
-    }, 10);
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "800 15px 'JetBrains Mono', monospace";
-    ctx.fillText(`✓ ${rightMetric}`, rightX + 40, stage.y + stage.h - 40, halfW - 80);
-    ctx.restore();
-
-    // 3. Центральный золотой бейдж выгоды (выстреливает на пружине!)
-    const sBadge = LectureAnimationEngine.stagger(p, 2, 3);
-    if (sBadge > 0.1) {
-      const bw = 220 * Math.min(1.05, sBadge);
-      const bh = 54;
-      const bx = stage.x + stage.w / 2 - bw / 2;
-      const by = stage.y + stage.h / 2 - bh / 2;
-      this.drawKurzgesagtCapsule(ctx, bx, by, bw, bh, {
-        top: "#f59e0b",
-        bottom: "#b45309",
-        rim: "#fef08a"
-      }, 27, "rgba(245, 158, 11, 0.65)");
-      ctx.fillStyle = "#ffffff";
-      ctx.font = "900 16px 'JetBrains Mono', monospace";
-      ctx.textAlign = "center";
-      ctx.fillText(deltaBadge, stage.x + stage.w / 2, by + 33, bw - 20);
-      ctx.textAlign = "left";
-    }
-
-    return { x: rightX + halfW / 2, y: stage.y + 190 };
-  }
-
-  // =========================================================================
-  // АРХЕТИП 4: INTERACTIVE CHART & FORMULA (Живой график 3Blue1Brown + Формула)
-  // =========================================================================
-  drawInteractiveChartFormula(ctx, stage, scene, timing) {
-    const { t, p, simP } = timing;
-    const { signals } = scene.visualPayload;
-
-    this.drawKurzgesagtCapsule(ctx, stage.x, stage.y, stage.w, stage.h, {
-      top: "rgba(15, 23, 42, 0.84)",
-      bottom: "rgba(9, 13, 22, 0.94)",
-      rim: "rgba(129, 140, 248, 0.4)"
-    }, 18);
-
-    // 1. Левая часть (56% ширины): Координатная плоскость с саморисующимися кривыми
-    const gx = stage.x + 48;
-    const gy = stage.y + 44;
-    const gw = 460;
-    const gh = 285;
-
-    // Сетка и оси
-    ctx.strokeStyle = "rgba(148, 163, 184, 0.16)";
-    ctx.lineWidth = 1;
-    for (let i = 1; i <= 4; i++) {
-      const ly = gy + (gh / 4) * i;
-      ctx.beginPath();
-      ctx.moveTo(gx, ly);
-      ctx.lineTo(gx + gw, ly);
-      ctx.stroke();
-    }
-
-    ctx.strokeStyle = "#94a3b8";
-    ctx.lineWidth = 2.5;
-    ctx.beginPath();
-    ctx.moveTo(gx, gy);
-    ctx.lineTo(gx, gy + gh);
-    ctx.lineTo(gx + gw, gy + gh);
-    ctx.stroke();
-
-    ctx.fillStyle = "#475569";
-    ctx.font = "700 12px 'Inter', sans-serif";
-    ctx.fillText(signals.yAxisLabel, gx + 10, gy + 16);
-    ctx.fillText(signals.xAxisLabel, gx + gw - 190, gy + gh + 24);
-
-    // Рисуем Кривую B (Красная — риск / затраты / резонанс) и Кривую A (Изумрудная — решение)
-    const steps = Math.max(2, Math.floor(simP * 60));
-    const drawCurve = (color, fnY) => {
-      ctx.save();
-      ctx.strokeStyle = color;
-      ctx.shadowColor = color;
-      ctx.shadowBlur = 10;
-      ctx.lineWidth = 3.5;
-      ctx.beginPath();
-      for (let i = 0; i <= steps; i++) {
-        const u = i / 60;
-        const px = gx + u * gw;
-        const py = gy + gh - fnY(u) * gh;
-        if (i === 0) ctx.moveTo(px, py);
-        else ctx.lineTo(px, py);
-      }
-      ctx.stroke();
-      ctx.restore();
-    };
-
-    if (signals.chartType === "resonance_peak") {
-      // Пик резонанса vs сглаженная кривая с сейсмоизоляцией
-      drawCurve("#f43f5e", (u) => 0.12 + 0.78 * Math.exp(-Math.pow((u - 0.5) / 0.16, 2)));
-      drawCurve("#10b981", (u) => 0.1 + 0.22 * Math.exp(-Math.pow((u - 0.5) / 0.28, 2)));
-    } else if (signals.chartType === "intersection") {
-      // Точка безубыточности Break-Even (пересечение затрат и выручки)
-      drawCurve("#f43f5e", (u) => 0.32 + u * 0.35);
-      drawCurve("#10b981", (u) => 0.05 + u * 0.85);
-    } else {
-      // Рост точности RAG vs деградация обычных субтитров
-      drawCurve("#f43f5e", (u) => 0.48 - Math.sin(u * 4) * 0.12);
-      drawCurve("#38bdf8", (u) => 0.2 + 0.72 * (1 - Math.exp(-u * 4)));
-    }
-
-    // Пульсирующий прицел в ключевой точке графика
-    const focusX = gx + gw * 0.54;
-    const focusY = gy + gh * 0.42;
-    if (simP > 0.55) {
-      const pulseR = 9 + Math.sin(t * 5) * 3;
-      ctx.strokeStyle = "#fde047";
-      ctx.lineWidth = 2.5;
-      ctx.beginPath();
-      ctx.arc(focusX, focusY, pulseR, 0, Math.PI * 2);
-      ctx.stroke();
-    }
-
-    // Легенда кривых
-    ctx.fillStyle = "#10b981";
-    ctx.font = "700 12.5px 'Inter', sans-serif";
-    ctx.fillText(`● ${signals.curveALabel}`, gx, gy + gh + 44);
-    ctx.fillStyle = "#f43f5e";
-    ctx.fillText(`● ${signals.curveBLabel}`, gx + 235, gy + gh + 44);
-
-    // 2. Правая часть: Светящаяся карточка формулы для экзамена
-    const fx = stage.x + 536;
-    const fw = stage.w - 560;
-    const fPop = LectureAnimationEngine.stagger(p, 1, 2);
-    if (fPop > 0.05) {
-      ctx.save();
-      ctx.globalAlpha = Math.min(1, fPop);
-      this.drawKurzgesagtCapsule(ctx, fx, stage.y + 36, fw, 320, {
-        top: "#FFFFFF",
-        bottom: "#F8FAFC",
-        rim: "#6366F1"
-      }, 16, "rgba(99, 102, 241, 0.16)");
-
-      ctx.fillStyle = "#4F46E5";
-      ctx.font = "800 13px 'JetBrains Mono', monospace";
-      ctx.fillText("ФОРМУЛА И ЗАКОНОМЕРНОСТЬ КУРСА", fx + 20, stage.y + 68);
-
-      // Блок самой формулы (высокий контраст)
-      this.drawKurzgesagtCapsule(ctx, fx + 18, stage.y + 84, fw - 36, 62, {
-        top: "#EEF2FF",
-        bottom: "#E0E7FF",
-        rim: "#4F46E5"
-      }, 12);
-      ctx.fillStyle = "#1E1B4B";
-      ctx.font = "800 18px 'JetBrains Mono', monospace";
-      ctx.fillText(this.formatMathText(signals.formulaCard.expression), fx + 30, stage.y + 122, fw - 60);
-
-      // Переменные на ясном языке
-      ctx.fillStyle = "#1E293B";
-      ctx.font = "600 14.5px 'Inter', sans-serif";
-      signals.formulaCard.variables.forEach((v, vIdx) => {
-        ctx.fillText(`• ${v}`, fx + 22, stage.y + 182 + vIdx * 32, fw - 40);
-      });
-
-      // Итоговый вывод внизу карточки
-      this.drawKurzgesagtCapsule(ctx, fx + 18, stage.y + 272, fw - 36, 64, {
-        top: "#ECFDF5",
-        bottom: "#D1FAE5",
-        rim: "#10B981"
-      }, 10);
-      ctx.fillStyle = "#065F46";
-      ctx.font = "700 14px 'Inter', sans-serif";
-      this.wrapText(ctx, `✓ ${signals.formulaCard.resultNote}`, fx + 30, stage.y + 298, fw - 56, 20, 2);
-      ctx.restore();
-    }
-
-    return { x: focusX, y: focusY };
-  }
-
-  // =========================================================================
   // АРХЕТИП 5: SHIELD CORE ARCHITECTURE (3 орбитальных щита + спидометр 96%)
   // =========================================================================
   drawShieldCoreArchitecture(ctx, stage, scene, timing) {
     const { t, p, simP, motionAmp } = timing;
-    const rings = scene.visualPayload.rings || [];
+    const theme = timing.theme || this.getSceneTheme(scene);
+    const rings = scene.visualPayload?.rings || [];
 
-    this.drawKurzgesagtCapsule(ctx, stage.x, stage.y, stage.w, stage.h, {
-      top: "rgba(15, 23, 42, 0.82)",
-      bottom: "rgba(9, 13, 22, 0.94)",
-      rim: "rgba(16, 185, 129, 0.4)"
-    }, 18);
+    if (!scene.styleVariant?.frameless) {
+      this.drawKurzgesagtCapsule(ctx, stage.x, stage.y, stage.w, stage.h, {
+        top: theme.surfaceTop,
+        bottom: theme.surfaceBottom,
+        rim: theme.surfaceBorder
+      }, 22, `rgba(${theme.shadowRgb}, 0.08)`);
+    }
 
     const cx = stage.x + 250;
     const cy = stage.y + 196;
-    const ringColors = ["#1D4ED8", "#7C3AED", "#0F766E"];
+    const pals = theme.cardPalettes || [];
+    const ringColors = [theme.primary, theme.secondary, theme.success];
 
-    // 1. Три вращающихся концентрических защитных кольца
+    // 1. Три вращающихся концентрических контура
     for (let rIdx = 2; rIdx >= 0; rIdx--) {
       const radius = 64 + rIdx * 42;
       const pop = LectureAnimationEngine.stagger(p, rIdx, 3);
@@ -4104,8 +4046,8 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
       ctx.save();
       ctx.translate(cx, cy);
       ctx.rotate(rot);
-      ctx.strokeStyle = ringColors[rIdx];
-      ctx.lineWidth = 6;
+      ctx.strokeStyle = ringColors[rIdx % ringColors.length];
+      ctx.lineWidth = 5;
       ctx.setLineDash([42, 18]);
       ctx.beginPath();
       ctx.arc(0, 0, radius * Math.min(1, pop), 0, Math.PI * 2);
@@ -4113,43 +4055,45 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
       ctx.restore();
     }
 
-    // 2. Центральное защищённое ядро
+    // 2. Центральное ядро
     this.drawKurzgesagtCapsule(ctx, cx - 46, cy - 46, 92, 92, {
-      top: "#059669",
-      bottom: "#064e3b",
-      rim: "#6ee7b7"
-    }, 46, "rgba(16, 185, 129, 0.6)");
+      top: "#ECFDF5",
+      bottom: "#D1FAE5",
+      rim: theme.success
+    }, 46, `rgba(${theme.shadowRgb}, 0.14)`);
 
     const stabilityPct = Math.round(60 + simP * 38);
-    ctx.fillStyle = "#ffffff";
+    ctx.fillStyle = "#065F46";
     ctx.font = "900 22px 'JetBrains Mono', monospace";
     ctx.textAlign = "center";
     ctx.fillText(`${stabilityPct}%`, cx, cy + 4);
+    const coreWord = scene.outputLang === "kk" ? "ӨЗЕК" : scene.outputLang === "en" ? "CORE" : "ЯДРО";
     ctx.font = "700 11px 'Inter', sans-serif";
-    ctx.fillStyle = "#a7f3d0";
-    ctx.fillText("ЗАЩИТА", cx, cy + 22);
+    ctx.fillStyle = "#047857";
+    ctx.fillText(coreWord, cx, cy + 22);
     ctx.textAlign = "left";
 
-    // 3. Правая колонка: Карточки 3 слоёв защиты
+    // 3. Правая колонка: Карточки 3 слоёв в светлой палитре
     const rx = stage.x + 485;
     const rw = stage.w - 510;
     rings.forEach((ring, idx) => {
       const rPop = LectureAnimationEngine.stagger(p, idx, 3, 0.12);
       if (rPop <= 0.05) return;
       const ry = stage.y + 38 + idx * 112;
+      const pal = pals[idx % Math.max(1, pals.length)] || { top: "#FFFFFF", bot: "#F8FAFC", stroke: ringColors[idx % ringColors.length], text: theme.ink };
       ctx.save();
       ctx.globalAlpha = Math.min(1, rPop);
       this.drawKurzgesagtCapsule(ctx, rx, ry, rw, 94, {
-        top: "rgba(30, 41, 59, 0.85)",
-        bottom: "rgba(15, 23, 42, 0.92)",
-        rim: ringColors[idx % ringColors.length]
+        top: pal.top,
+        bottom: pal.bot,
+        rim: pal.stroke
       }, 14);
 
-      ctx.fillStyle = ringColors[idx % ringColors.length];
+      ctx.fillStyle = pal.stroke;
       ctx.font = "800 16px 'Manrope', sans-serif";
       ctx.fillText(ring.name, rx + 20, ry + 34, rw - 36);
 
-      ctx.fillStyle = "#334155";
+      ctx.fillStyle = theme.ink;
       ctx.font = "500 14.5px 'Inter', sans-serif";
       ctx.fillText(ring.role, rx + 20, ry + 64, rw - 36);
       ctx.restore();
@@ -4159,107 +4103,18 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
   }
 
   // =========================================================================
-  // АРХЕТИП 6: CONSTELLATION SYNTHESIS (Созвездие терминов + Чек-лист экзамена)
-  // =========================================================================
-  drawConstellationSynthesis(ctx, stage, scene, timing) {
-    const { t, p, simP } = timing;
-    const nodes = scene.visualPayload.constellationNodes || [];
-
-    this.drawKurzgesagtCapsule(ctx, stage.x, stage.y, stage.w, stage.h, {
-      top: "rgba(15, 23, 42, 0.84)",
-      bottom: "rgba(9, 13, 22, 0.95)",
-      rim: "rgba(250, 204, 21, 0.45)"
-    }, 18);
-
-    const cx = stage.x + 285;
-    const cy = stage.y + 196;
-    const rx = 185;
-    const ry = 128;
-
-    const starCoords = nodes.map((n, idx) => {
-      const ang = -Math.PI / 2 + (idx * Math.PI * 2) / Math.max(1, nodes.length);
-      return {
-        x: cx + Math.cos(ang) * rx,
-        y: cy + Math.sin(ang) * ry + Math.sin(t * 2 + idx) * 3,
-        term: n.term
-      };
-    });
-
-    // Синаптические лучи от центра к терминам + бегущие импульсы
-    starCoords.forEach((sc, idx) => {
-      const lineP = LectureAnimationEngine.clamp((simP - idx * 0.1) * 2, 0, 1);
-      const cp = { x: (cx + sc.x) / 2, y: (cy + sc.y) / 2 - 15 };
-      this.drawTrimmedBezier(ctx, { x: cx, y: cy }, cp, sc, lineP, "#6366f1", 2.5);
-      if (lineP > 0.5) {
-        this.drawBezierPulse(ctx, { x: cx, y: cy }, cp, sc, (t * 0.8 + idx * 0.2) % 1, "#fde047");
-      }
-    });
-
-    // Центральное ядро темы
-    this.drawKurzgesagtCapsule(ctx, cx - 78, cy - 32, 156, 64, {
-      top: "#4f46e5",
-      bottom: "#312e81",
-      rim: "#a5b4fc"
-    }, 20, "rgba(99, 102, 241, 0.55)");
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "800 14px 'Manrope', sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText("СИСТЕМА КУРСА", cx, cy - 4);
-    ctx.fillStyle = "#fde047";
-    ctx.font = "700 12px 'JetBrains Mono', monospace";
-    ctx.fillText("100% СИЛЛАБУС", cx, cy + 16);
-
-    // Звёзды-термины вокруг
-    starCoords.forEach((sc, idx) => {
-      const pop = LectureAnimationEngine.stagger(p, idx, starCoords.length, 0.08);
-      if (pop <= 0.05) return;
-      const w = 164 * Math.min(1, pop);
-      const h = 44 * Math.min(1, pop);
-      this.drawKurzgesagtCapsule(ctx, sc.x - w / 2, sc.y - h / 2, w, h, {
-        top: "#FFFFFF",
-        bottom: "#F8FAFC",
-        rim: "#2563EB"
-      }, 12);
-      ctx.fillStyle = "#18181B";
-      ctx.font = "800 12.5px 'Manrope', sans-serif";
-      ctx.fillText(sc.term, sc.x, sc.y + 4, w - 16);
-    });
-    ctx.textAlign = "left";
-
-    // Правая карточка: Главные выводы самого урока
-    const bx = stage.x + 565;
-    const bw = stage.w - 588;
-    this.drawKurzgesagtCapsule(ctx, bx, stage.y + 34, bw, 324, {
-      top: "#ECFDF5",
-      bottom: "#F0FDF4",
-      rim: "#10B981"
-    }, 16);
-
-    ctx.fillStyle = "#0F766E";
-    ctx.font = "800 15px 'Manrope', sans-serif";
-    ctx.fillText("🎓 ГЛАВНОЕ ИЗ ЛЕКЦИИ К ЭКЗАМЕНУ", bx + 20, stage.y + 70, bw - 36);
-
-    const dynamicChecks = nodes.slice(0, 4).map((n) => `✓ ${n.term}${n.tag ? ` — ${n.tag}` : ""}`);
-    const checks = dynamicChecks.length
-      ? [...dynamicChecks, "✓ Проверьте знания в мини-тесте"]
-      : ["✓ Ключевые понятия темы разобраны", "✓ Причины и следствия связаны", "✓ Готово к мини-тесту"];
-    checks.forEach((ch, cIdx) => {
-      const cPop = LectureAnimationEngine.stagger(p, cIdx, checks.length, 0.1);
-      if (cPop > 0.2) {
-        ctx.fillStyle = "#1E293B";
-        ctx.font = "600 13.5px 'Inter', sans-serif";
-        ctx.fillText(ch, bx + 20, stage.y + 115 + cIdx * 42, bw - 34);
-      }
-    });
-
-    return { x: cx, y: cy };
-  }
-
-  // =========================================================================
   // ПРОЦЕДУРНЫЙ 2D-ПЕРСОНАЖ В СТИЛЕ DUOLINGO / RIVE (2-Bone IK + Gaze + 5 Жестов)
   // =========================================================================
-  drawProceduralTutor(ctx, cx, cy, t, scene, focalTarget, isPause, beats = null) {
+  drawProceduralTutor(ctx, cx, cy, t, scene, focalTarget, isPause, beats = null, opts = {}) {
+    const scale = opts.scale ?? 1.0;
+    const isCornerBadge = opts.mode === "corner_badge";
+    const isRightSide = opts.side === "right";
     ctx.save();
+    if (scale !== 1.0) {
+      ctx.translate(cx, cy);
+      ctx.scale(scale, scale);
+      ctx.translate(-cx, -cy);
+    }
 
     // Чтение реальной амплитуды речи через AnalyserNode для точного Lip-Sync
     let voiceAmp = 0;
@@ -4468,21 +4323,23 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
       }
     }
 
-    // Мягкий Spotlight Halo на активном узле схемы (в стиле Manim, не перечёркивает текст!)
+    // Мягкий Spotlight Halo на активном узле схемы (отключаем в corner_badge)
     const beatPulseAlpha = beats ? Math.max(0.24, 1 - beats.beatP * 1.1) : 0.7;
-    if (!isPause) {
+    if (!isPause && !isCornerBadge) {
       this.drawLaserBeam(ctx, handGoal, { x: this.tutor.targetX, y: this.tutor.targetY }, beatPulseAlpha, theme);
     }
 
-    // Подпись жеста КЖЯ/РЖЯ и роли под персонажем (локализована RU / KK / EN, высокий контраст!)
-    ctx.fillStyle = theme.ink;
-    ctx.font = "800 13.5px 'Manrope', sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText(ui.tutorName, cx, cy + 148, 224);
-    ctx.fillStyle = theme.primary;
-    ctx.font = "700 12px 'Inter', sans-serif";
-    ctx.fillText(ui.gestures[scene.tutorCue] || ui.gestures.POINT, cx, cy + 170, 228);
-    ctx.textAlign = "left";
+    // Подпись жеста КЖЯ/РЖЯ и роли под персонажем (скрываем в компактном corner_badge)
+    if (!isCornerBadge) {
+      ctx.fillStyle = theme.ink;
+      ctx.font = "800 13.5px 'Manrope', sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(ui.tutorName, cx, cy + 148, 224);
+      ctx.fillStyle = theme.primary;
+      ctx.font = "700 12px 'Inter', sans-serif";
+      ctx.fillText(ui.gestures[scene.tutorCue] || ui.gestures.POINT, cx, cy + 170, 228);
+      ctx.textAlign = "left";
+    }
 
     ctx.restore();
   }
@@ -4717,6 +4574,13 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
       } catch (_) {}
     }
 
+    const ctx = this.ensureAudioContext();
+    if (ctx && ctx.state === "suspended") {
+      try {
+        await ctx.resume();
+      } catch (_) {}
+    }
+
     return new Promise((resolve, reject) => {
       try {
         const offCanvas = document.createElement("canvas");
@@ -4730,12 +4594,8 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
         let exportAudioCtx = null;
         let audioStartAnchor = 0;
         const audioSources = [];
-        const ctx = this.ensureAudioContext();
         if (ctx && typeof ctx.createMediaStreamDestination === "function" && this.scenes.some((s) => s.audioBuffer)) {
           try {
-            if (ctx.state === "suspended") {
-              ctx.resume().catch(() => {});
-            }
             const dest = ctx.createMediaStreamDestination();
             exportAudioCtx = ctx;
             audioStartAnchor = ctx.currentTime + 0.08;
@@ -4800,7 +4660,7 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
           resolve({ blob, ext });
         };
 
-        const exportDurationSec = Math.min(210, Math.max(4, this.totalDuration));
+        const exportDurationSec = Math.min(360, Math.max(4, this.totalDuration));
         const wallStartMs = performance.now();
 
         this.renderFrameOnContext(offCtx, offCanvas.width, offCanvas.height, 0);

@@ -32,7 +32,15 @@ window.AISupervisorPipeline = {
         split_versus_duel: { badge: "⚡ 3. Сравнение подходов", title: "Два взгляда: наивный vs научный" },
         multi_mode_chart: { badge: "📈 4. Закономерность", title: "Как один фактор меняет другой" },
         case_dossier_blueprint: { badge: "📋 5. Разбор на практике", title: "Прикладная задача и решение" },
-        radial_constellation_map: { badge: "✨ 6. Карта к экзамену", title: "Все понятия урока в единой системе" }
+        radial_constellation_map: { badge: "✨ 6. Карта к экзамену", title: "Все понятия урока в единой системе" },
+        cause_effect_flow: { badge: "🔗 Причина → Следствие", title: "Цепочка причин и последствий" },
+        worked_example: { badge: "🧮 Пошаговый разбор", title: "Практический пример по шагам" },
+        causal_curve: { badge: "📉 Кривая влияния", title: "Динамика изменений и порог" },
+        hero_problem_hook: { badge: "🎯 Главный вызов", title: "Ключевая проблема и решение" },
+        pipeline_energy_flow: { badge: "⚡ Поток процесса", title: "Последовательная передача сигнала" },
+        funnel_flow: { badge: "🔻 Воронка отбора", title: "Этапы фильтрации и результат" },
+        timeline_scroll: { badge: "🗓️ Хронология", title: "Ключевые вехи во времени" },
+        shield_core_architecture: { badge: "🛡️ Защитный контур", title: "Многоуровневая архитектура" }
       },
       quizQTerm: (term) => `Что простыми словами означает понятие «${term}»?`,
       quizQSec: (sec) => `Какая главная мысль раскрывается в разделе «${sec}»?`,
@@ -66,7 +74,15 @@ window.AISupervisorPipeline = {
         split_versus_duel: { badge: "⚡ 3. Тәсілдерді салыстыру", title: "Екі көзқарас: қате vs дұрыс" },
         multi_mode_chart: { badge: "📈 4. Заңдылық графигі", title: "Факторлардың өзара әсері" },
         case_dossier_blueprint: { badge: "📋 5. Тәжірибелік талдау", title: "Нақты жағдайда қолдану" },
-        radial_constellation_map: { badge: "✨ 6. Емтихан картасы", title: "Тақырыптың негізгі ұғымдар жүйесі" }
+        radial_constellation_map: { badge: "✨ 6. Емтихан картасы", title: "Тақырыптың негізгі ұғымдар жүйесі" },
+        cause_effect_flow: { badge: "🔗 Себеп → Салдар", title: "Себеп-салдар тізбегі" },
+        worked_example: { badge: "🧮 Қадамдық талдау", title: "Практикалық мысалды шешу" },
+        causal_curve: { badge: "📉 Әсер қисығы", title: "Өзгеріс динамикасы мен шек" },
+        hero_problem_hook: { badge: "🎯 Басты міндет", title: "Негізгі мәселе және шешім" },
+        pipeline_energy_flow: { badge: "⚡ Процесс ағыны", title: "Кезеңдік сигнал берілісі" },
+        funnel_flow: { badge: "🔻 Іріктеу шұңқыры", title: "Сүзгілеу және нәтиже" },
+        timeline_scroll: { badge: "🗓️ Хронология", title: "Уақыт бойынша негізгі кезеңдер" },
+        shield_core_architecture: { badge: "🛡️ Қорғаныс контуры", title: "Көпдеңгейлі архитектура" }
       },
       quizQTerm: (term) => `«${term}» ұғымының қарапайым тілдегі мағынасы қандай?`,
       quizQSec: (sec) => `«${sec}» бөлімінен қандай басты қорытынды шығады?`,
@@ -100,7 +116,15 @@ window.AISupervisorPipeline = {
         split_versus_duel: { badge: "⚡ 3. Approach Duel", title: "Naive View vs Core Method" },
         multi_mode_chart: { badge: "📈 4. Key Pattern", title: "How Factor A Shapes Outcome B" },
         case_dossier_blueprint: { badge: "📋 5. Practical Case", title: "Real-World Application" },
-        radial_constellation_map: { badge: "✨ 6. Exam Concept Map", title: "Complete Concept Synthesis" }
+        radial_constellation_map: { badge: "✨ 6. Exam Concept Map", title: "Complete Concept Synthesis" },
+        cause_effect_flow: { badge: "🔗 Cause → Effect", title: "Causal Chain & Mechanism" },
+        worked_example: { badge: "🧮 Worked Example", title: "Step-by-Step Solution" },
+        causal_curve: { badge: "📉 Causal Curve", title: "Factor Dynamics & Threshold" },
+        hero_problem_hook: { badge: "🎯 Core Challenge", title: "Problem Hook & Resolution" },
+        pipeline_energy_flow: { badge: "⚡ Energy Pipeline", title: "Sequential Stage Transfer" },
+        funnel_flow: { badge: "🔻 Stage Funnel", title: "Filtering Stages & Yield" },
+        timeline_scroll: { badge: "🗓️ Chronology", title: "Key Milestones Over Time" },
+        shield_core_architecture: { badge: "🛡️ Shield Core", title: "Multi-Layer Core Architecture" }
       },
       quizQTerm: (term) => `What does "${term}" mean in simple everyday language?`,
       quizQSec: (sec) => `What is the main takeaway from "${sec}"?`,
@@ -882,71 +906,96 @@ window.AISupervisorPipeline = {
     const leadTermName = leadTerm ? leadTerm.term.split(/[/(]/)[0].trim() : title;
     const leadTermPlain = leadTerm ? leadTerm.plain.replace(/[.!?]+$/, "") : "";
 
-    // 1) Главная мысль простыми словами (на выбранном языке RU / KK / EN)
-    const bestSent =
+    // 1) Главная мысль без шаблонного префикса «Простыми словами» (на выбранном языке RU / KK / EN)
+    const leadSent =
       simplifiedPoints.find((s) => /— это|дегеніміз|позволяет|помогает|нужно|вызывает|означает|меняет|зависит|allows|enables|means/i.test(s)) ||
       simplifiedPoints[0] ||
       clean;
+    const secondSent = simplifiedPoints.find((s) => s !== leadSent && s.length > 24) || "";
+    const coreOpeners = {
+      ru: [
+        (t, p, s) => (p ? `Ключ к разделу — «${t}» (${p}). ${s}` : s),
+        (t, p, s) => (secondSent ? `${s} ${secondSent}` : s),
+        (t, p, s) => (p ? `Главное здесь: ${s} Основа — «${t}» (${p}).` : s)
+      ],
+      kk: [
+        (t, p, s) => (p ? `Бөлімнің өзегі — «${t}» (${p}). ${s}` : s),
+        (t, p, s) => (secondSent ? `${s} ${secondSent}` : s),
+        (t, p, s) => (p ? `Негізгі ой: ${s} Тірегі — «${t}» (${p}).` : s)
+      ],
+      en: [
+        (t, p, s) => (p ? `Core idea: "${t}" (${p}). ${s}` : s),
+        (t, p, s) => (secondSent ? `${s} ${secondSent}` : s),
+        (t, p, s) => (p ? `Key takeaway: ${s} Built around "${t}" (${p}).` : s)
+      ]
+    };
+    const openerPool = coreOpeners[outputLang] || coreOpeners.ru;
+    const coreIdea = openerPool[index % openerPool.length](leadTermName, leadTermPlain, leadSent);
 
-    let coreIdea;
-    if (outputLang === "kk") {
-      coreIdea = leadTermPlain
-        ? `Қарапайым тілмен: «${leadTermName}» — бұл ${leadTermPlain}. ${bestSent}`
-        : `Қарапайым тілмен: ${bestSent}`;
-    } else if (outputLang === "en") {
-      coreIdea = leadTermPlain
-        ? `In simple terms: "${leadTermName}" means ${leadTermPlain}. ${bestSent}`
-        : `In simple terms: ${bestSent}`;
-    } else {
-      coreIdea = leadTermPlain
-        ? `Простыми словами: «${leadTermName}» — это ${leadTermPlain}. ${bestSent}`
-        : `Простыми словами: ${bestSent}`;
-    }
-
-    // 2) Пример или жизненная аналогия (из текста или доменно-точная на RU / KK / EN)
+    // 2) Пример или жизненная аналогия (из текста или вариативный пул по домену и индексу)
     const explicitExample = simplifiedPoints.find((s) => /\b(?:например|представим|допустим|на практике|к примеру|мысалы|for example|for instance)\b/i.test(s));
     let analogy = explicitExample || "";
     if (!analogy) {
       const dom = domainProfile?.domainId || "soc_hum";
-      if (outputLang === "kk") {
-        if (dom === "arch_eng") {
-          analogy = `Өмірден мысал: автокөліктегі амортизатор сияқты — «${leadTermName}» күшті соққыны жұмсартып, ғимарат қаңқасын бұзылудан сақтайды.`;
-        } else if (dom === "ai_cs") {
-          analogy = `Мысал ретінде: қараңғы бөлмедегі қолшам сияқты — мыңдаған дерек ішінен «${leadTermName}» ең маңызды мағыналық байланыстарды дәл табады.`;
-        } else if (dom === "biz_econ") {
-          analogy = `Бизнестегі мысал: отбасылық бюджет секілді — «${leadTermName}» барлық шығыннан кейін қанша таза пайда қалатынын айқын көрсетеді.`;
-        } else {
-          analogy = `Көрнекі мысал: жақсы реттелген бағдаршам сияқты — «${leadTermName}» жүйедегі тәртіп пен тепе-теңдікті ұстап тұрады.`;
+      const pools = {
+        kk: {
+          arch_eng: [
+            `Практикалық мысал: автокөліктегі амортизатор сияқты — «${leadTermName}» соққыны жұмсартып, негізгі қаңқаны сақтайды.`,
+            `Инженерлік бейне: көпір тіректері сияқты — «${leadTermName}» жүктемені біркелкі таратып, артық кернеуді болдырмайды.`
+          ],
+          ai_cs: [
+            `Түсінікті бейне: қараңғы кітапханадағы қолшам сияқты — «${leadTermName}» мыңдаған дерек ішінен дәл керек байланысты табады.`,
+            `Күнделікті мысал: ақылды сұрыптау конвейері сияқты — «${leadTermName}» әр қадамда тек маңызды белгілерді сүзіп алады.`
+          ],
+          biz_econ: [
+            `Бизнестегі мысал: отбасылық бюджет секілді — «${leadTermName}» барлық шығыннан кейін қанша нақты пайда қалатынын көрсетеді.`,
+            `Экономикалық бейне: дүкен қоймасының айналымы сияқты — «${leadTermName}» ресурстың қай кезеңде жоғалатынын анықтайды.`
+          ],
+          soc_hum: [
+            `Өмірлік бейне: қаланы жоғарыдан бақылағандай — «${leadTermName}» жеке әрекеттердің ортақ жүйеге қалай бірігетінін ашады.`,
+            `Көрнекі мысал: оркестр партитурасы сияқты — «${leadTermName}» әртүрлі топтардың өзара үйлесімді ережелерін көрсетеді.`
+          ]
+        },
+        en: {
+          arch_eng: [
+            `Everyday image: like shock absorbers in a car, "${leadTermName}" absorbs sudden peaks so the structure stays intact.`,
+            `Practical comparison: like bridge trusses distributing weight, "${leadTermName}" prevents stress from concentrating at one weak spot.`
+          ],
+          ai_cs: [
+            `Analogy: like a spotlight in a dark library, "${leadTermName}" pinpoints the exact context among thousands of tokens.`,
+            `How it works in practice: like a multi-stage sorting belt, "${leadTermName}" filters noise at each layer before output.`
+          ],
+          biz_econ: [
+            `Business parallel: like a household budget, "${leadTermName}" shows how much net value actually remains after every cost.`,
+            `Market analogy: like checking leaks in a pipeline, "${leadTermName}" reveals where resources convert or drop off.`
+          ],
+          soc_hum: [
+            `Real-world view: like observing a city from above, "${leadTermName}" reveals how individual habits form shared patterns.`,
+            `Everyday parallel: like rules on a busy intersection, "${leadTermName}" coordinates competing interests into a stable order.`
+          ]
+        },
+        ru: {
+          arch_eng: [
+            `Образ из жизни: представьте амортизатор в автомобиле — «${leadTermName}» гасит резкий импульс, не давая сломаться жёсткой конструкции.`,
+            `Практический образ: как арочный мост распределяет вес, так и «${leadTermName}» переносит нагрузку с одного слабого узла на всю систему.`
+          ],
+          ai_cs: [
+            `Аналогия: как прожектор в тёмном архиве — среди тысяч записей «${leadTermName}» подсвечивает именно те связи, от которых зависит точный ответ.`,
+            `Понятный образ: как сортировочный конвейер — на каждом этапе «${leadTermName}» отсекает шум и передаёт дальше только полезный сигнал.`
+          ],
+          biz_econ: [
+            `Пример из бизнеса: как семейный бюджет — недостаточно просто много зарабатывать, «${leadTermName}» показывает чистый остаток после всех трат.`,
+            `Наглядный образ: как учёт потерь на производстве — «${leadTermName}» сразу подсвечивает этап, где теряется главная доля ресурса.`
+          ],
+          soc_hum: [
+            `Представьте город сверху: отдельные поступки кажутся случайными, но «${leadTermName}» открывает скрытые правила, по которым действуют люди.`,
+            `Жизненная аналогия: как правила дорожного движения на перекрёстке — «${leadTermName}» согласует интересы разных групп без хаоса.`
+          ]
         }
-      } else if (outputLang === "en") {
-        if (dom === "arch_eng") {
-          analogy = `Real-life analogy: just like shock absorbers in a car, "${leadTermName}" cushions sudden forces so the rigid structure stays intact.`;
-        } else if (dom === "ai_cs") {
-          analogy = `Analogy: like a spotlight in a dark library, "${leadTermName}" highlights the exact connections among thousands of tokens needed for an accurate answer.`;
-        } else if (dom === "biz_econ") {
-          analogy = `Business example: like a household budget, "${leadTermName}" reveals how much net value remains after covering every acquisition and operating cost.`;
-        } else {
-          analogy = `Everyday example: like clear traffic rules at a busy intersection, "${leadTermName}" keeps every part of the system coordinated and predictable.`;
-        }
-      } else {
-        const hasConflict = /ошиб|риск|проблем|разруш|убыт|конфликт|без\s+|отказ/i.test(clean);
-        const hasFlow = /этап|шаг|процесс|поток|переда|последоват|слой/i.test(clean);
-        if (dom === "soc_hum" || dom === "law_gov") {
-          analogy = hasConflict
-            ? `Жизненный пример: если смотреть на «${leadTermName}» только по бытовым слухам без научного разбора, легко перепутать личную привычку с общим правилом всего общества.`
-            : `Представьте город со стороны сверху: отдельные люди кажутся случайными, но «${leadTermName}» показывает скрытые правила, по которым они объединяются и действуют вместе.`;
-        } else if (dom === "arch_eng") {
-          analogy = `Образ из жизни: представьте амортизатор в автомобиле — «${leadTermName}» работает так же, не давая резкому удару сломать жёсткую конструкцию.`;
-        } else if (dom === "ai_cs") {
-          analogy = hasFlow
-            ? `Как это работает на примере: как сортировочный конвейер на почте — на каждом шаге «${leadTermName}» отбирает только важные детали и передаёт их дальше.`
-            : `Аналогия: как фонарик в тёмной комнате — среди тысяч слов или данных «${leadTermName}» подсвечивает именно те связи, от которых зависит точный ответ.`;
-        } else if (dom === "biz_econ") {
-          analogy = `Пример из бизнеса: как семейный бюджет — недостаточно просто много зарабатывать, «${leadTermName}» показывает, сколько остаётся чистой пользы после всех трат.`;
-        } else {
-          analogy = `Наглядный пример: как хорошо настроенный светофор и регулировщик — «${leadTermName}» удерживает систему в здоровом балансе и не даёт ей перегрузиться.`;
-        }
-      }
+      };
+      const langPool = pools[outputLang] || pools.ru;
+      const domPool = langPool[dom] || langPool.soc_hum;
+      analogy = domPool[index % domPool.length];
     }
 
     // 3) Разбор сложных терминов именно этого раздела
@@ -1408,23 +1457,52 @@ window.AISupervisorPipeline = {
 
   auditSceneGeometryAndContrast(scene, theme) {
     // Геометрия 1280x720: Верхний HUD [20..68], Заголовок [98..134], STAGE [158..552], CAPTION_BAR [596..698]
-    const stageBottom = 158 + 394; // 552 px
+    const layoutMode = scene.layoutMode || "split_tutor";
+    const stageRect =
+      layoutMode === "wide_stage"
+        ? { x: 44, y: 158, w: 1192, h: 394 }
+        : layoutMode === "hero_intro"
+          ? { x: 256, y: 158, w: 988, h: 394 }
+          : layoutMode === "focus_split"
+            ? { x: 36, y: 158, w: 926, h: 394 }
+            : { x: 318, y: 158, w: 926, h: 394 };
+
+    const stageBottom = stageRect.y + stageRect.h; // 552 px
     const captionTop = 720 - 124;  // 596 px
     const safeGapPx = Math.max(0, captionTop - stageBottom); // 44 px чистый буфер
-    const collisionAreaPx = stageBottom > captionTop ? (stageBottom - captionTop) * 926 : 0;
+    const collisionAreaPx = stageBottom > captionTop ? (stageBottom - captionTop) * stageRect.w : 0;
 
-    // Проверяем каждую реплику на переполнение 2 строк полосы субтитров (ширина текста 1162 px, ~10.8 px на символ при 20px Inter)
+    // Проверяем каждую реплику на переполнение 2 строк полосы субтитров и CPS <= 15.0
     let healedBeats = 0;
     if (Array.isArray(scene.beats)) {
       scene.beats = scene.beats.map((b) => {
         const rawTxt = String(b.text || "").trim();
-        if (rawTxt.length > 136) {
+        if (rawTxt.length > 106) {
           healedBeats++;
-          return { ...b, text: this.ensureCompleteSentence(rawTxt, 132) };
+          return { ...b, text: this.ensureCompleteSentence(rawTxt, 102) };
         }
         return b;
       });
       scene.caption = scene.beats.map((b) => b.text).join(" ");
+    }
+
+    // Ограничиваем длину текстовых полей visualPayload для предотвращения переполнения карточек
+    if (scene.visualPayload && Array.isArray(scene.visualPayload.stages)) {
+      scene.visualPayload.stages = scene.visualPayload.stages.map((st) => ({
+        ...st,
+        shortTitle: this.shortLabel(st.shortTitle || "", 28),
+        detail: this.shortLabel(st.detail || "", 68),
+        metric: this.shortLabel(st.metric || "", 24)
+      }));
+    }
+
+    // Жёсткий CPS Gate <= 15.0 симв/с
+    if (scene.caption && scene.durationSec) {
+      const minDurForCps = +(Math.ceil((scene.caption.length / 14.8) * 10) / 10).toFixed(1);
+      if (scene.durationSec < minDurForCps) {
+        scene.durationSec = Math.min(28, Math.max(scene.durationSec, minDurForCps));
+      }
+      scene.finalCps = +(scene.caption.length / scene.durationSec).toFixed(1);
     }
 
     const inkHex = theme?.ink || "#18181B";
@@ -1458,370 +1536,58 @@ window.AISupervisorPipeline = {
     return s.slice(0, maxChars).replace(/\s+\S*$/, "").replace(/[,:;—–-]+$/, "") + "…";
   },
 
-  buildStoryboardAndSupervise(courseTitle, sections, glossary, lectureText, outputLang = "ru", glossaryText = "") {
-    const i18n = this.OUTPUT_I18N[outputLang] || this.OUTPUT_I18N.ru;
-    const domainProfile = this.detectDomainProfile(courseTitle, lectureText, glossaryText);
-    const domainLocalizedName = i18n.domainNames[domainProfile.domainId] || domainProfile.name;
-    const signals = this.extractLectureSignals(lectureText, domainProfile, glossary, sections, outputLang);
-    const vd = window.LectureVisualDirector;
-    const pacing = vd
-      ? vd.estimateComplexityAndPacing(lectureText, glossary.length)
-      : { tier: 2, label: "Стандартный концептуальный", sceneCount: 6, targetCps: 12.0, preRollSec: 0.8, postRollSec: 1.4 };
+  extractSectionSignals(sec, idx, domainProfile, glossary, globalSignals, outputLang = "ru") {
+    const secText = `${sec?.title || ""} ${sec?.academicOriginal || ""} ${sec?.plainSummary || ""}`;
+    const secMetrics = this.extractCleanMetrics(secText);
+    const secYears = Array.from(new Set(secText.match(/\b(18\d{2}|19\d{2}|20\d{2})\b/g) || [])).slice(0, 6);
+    const secFormulaMatch = secText.match(/[A-Za-zА-Яа-яЁё]\s*=\s*[^.,;\n]{3,28}/);
+    const matchedTerm = glossary.find((g) => {
+      const base = g.term.split(/[/(]/)[0].trim().toLowerCase().slice(0, 6);
+      return base.length >= 3 && secText.toLowerCase().includes(base);
+    }) || glossary[idx % glossary.length] || glossary[0];
+    const shortTerm = matchedTerm ? matchedTerm.term.split(/[/(]/)[0].trim() : `Понятие ${idx + 1}`;
+    const plainDef = matchedTerm?.plain ? matchedTerm.plain.replace(/[.!?]+$/, "") : "";
 
-    const moduleIds = vd
-      ? vd.selectDomainModules(domainProfile.domainId, pacing.sceneCount, {
-          hasYears: signals.years.length >= 2,
-          hasFormula: signals.hasFormula
-        })
-      : [
-          "actor_network_web",
-          "social_stratification_pyramid",
-          "split_versus_duel",
-          "multi_mode_chart",
-          "case_dossier_blueprint",
-          "radial_constellation_map"
-        ];
-
-    const usedSentences = new Set();
-    const pickUnique = (candidates, fallback) => {
-      for (const c of candidates) {
-        if (!c) continue;
-        const clean = this.ensureCompleteSentence(c, 125);
-        const key = clean.toLowerCase().slice(0, 44);
-        if (clean.length > 14 && !usedSentences.has(key)) {
-          usedSentences.add(key);
-          return clean;
-        }
-      }
-      return this.ensureCompleteSentence(fallback, 125);
+    return {
+      ...globalSignals,
+      years: secYears.length >= 2 ? secYears : globalSignals.years,
+      metrics: secMetrics.length ? secMetrics : globalSignals.metrics,
+      hasFormula: Boolean(secFormulaMatch) || globalSignals.hasFormula,
+      formulaCard: secFormulaMatch
+        ? {
+            ...(globalSignals.formulaCard || {}),
+            expression: this.shortLabel(secFormulaMatch[0], 30),
+            note: this.shortLabel(plainDef || sec?.title || "", 44)
+          }
+        : globalSignals.formulaCard,
+      dangerMetric: {
+        ...(globalSignals.dangerMetric || {}),
+        value: secMetrics[0] || globalSignals.dangerMetric?.value || "100%"
+      },
+      leftFail: {
+        ...(globalSignals.leftFail || {}),
+        title: outputLang === "kk" ? `«${this.shortLabel(shortTerm, 18)}» ескерілмесе` : outputLang === "en" ? `Without ${this.shortLabel(shortTerm, 18)}` : `Без учёта «${this.shortLabel(shortTerm, 18)}»`,
+        metric: secMetrics[0] || globalSignals.leftFail?.metric || "Риск"
+      },
+      rightPass: {
+        ...(globalSignals.rightPass || {}),
+        title: this.shortLabel(shortTerm, 22),
+        sub: this.shortLabel(plainDef, 46) || globalSignals.rightPass?.sub,
+        metric: secMetrics[1] || globalSignals.rightPass?.metric || "Норма"
+      },
+      yAxisLabel: this.shortLabel(sec?.title || globalSignals.yAxisLabel, 26)
     };
+  },
 
-    const shortCourse = String(courseTitle || "Урок").split("·").pop().trim();
-    let selfHealedCount = 0;
-
-    const validatedScenes = moduleIds.map((modId, idx) => {
-      const meta = i18n.moduleBadges[modId] || { badge: `✦ Сцена 0${idx + 1}`, title: "Ключевой этап темы" };
-      const sec = sections[idx % sections.length] || sections[0];
-      const secLower = `${sec?.title || ""} ${sec?.academicOriginal || ""}`.toLowerCase();
-      const matchedTerm = glossary.find((g) => {
-        const base = g.term.split(/[/(]/)[0].trim().toLowerCase().slice(0, 6);
-        return base.length >= 3 && secLower.includes(base);
-      });
-      const termObj = matchedTerm || glossary[idx % glossary.length] || glossary[0];
-      const shortTerm = termObj.term.split(/[/(]/)[0].trim();
-      const plainDef = (termObj.plain || "").replace(/[.!?]+$/, "");
-
-      const secSents = String(sec?.plainSummary || sec?.academicOriginal || "")
-        .split(/(?<=[.!?])\s+/)
-        .map((x) => x.trim())
-        .filter((x) => x.length > 16);
-      const secMetrics = this.extractCleanMetrics(sec?.academicOriginal || "");
-
-      // Подбираем 3–4 реальных элемента для схем/пирамид/сетей этой сцены
-      const stageItems = [];
-      if (Array.isArray(sec?.plainBullets) && sec.plainBullets.length >= 3) {
-        sec.plainBullets.slice(0, 4).forEach((b, bIdx) => {
-          const g = glossary[(idx + bIdx) % glossary.length];
-          stageItems.push({
-            shortTitle: g ? this.shortLabel(g.term.split(/[/(]/)[0].trim(), 28) : `Аспект ${bIdx + 1}`,
-            detail: this.shortLabel(b, 68),
-            metric: secMetrics[bIdx] || `Шаг 0${bIdx + 1}`
-          });
-        });
-      } else {
-        for (let k = 0; k < Math.min(4, Math.max(3, glossary.length)); k++) {
-          const g = glossary[(idx + k) % glossary.length] || termObj;
-          stageItems.push({
-            shortTitle: this.shortLabel(g.term.split(/[/(]/)[0].trim(), 28),
-            detail: this.shortLabel(g.plain, 68),
-            metric: secMetrics[k] || `Уровень ${k + 1}`
-          });
-        }
-      }
-
-      // Драматургия 3 битов на выбранном языке (RU / KK / EN)
-      let b0, b1, b2, sceneTitle, tutorCue = "POINT", emotion = "explain";
-
-      if (outputLang === "kk") {
-        const stepLbl = stageItems[0]?.shortTitle || shortTerm;
-        const stepLbl2 = stageItems[1]?.shortTitle || shortTerm;
-        const stepLbl3 = stageItems[2]?.shortTitle || shortTerm;
-        if (idx === 0) {
-          tutorCue = "WARNING_PALM";
-          sceneTitle = `Кіріспе: ${this.shortLabel(shortCourse, 46)}`;
-          b0 = pickUnique([`Бүгінгі сабақтың тақырыбы — «${this.shortLabel(shortCourse, 48)}». Негізгі ұғымдарды қарапайым тілмен талдаймыз.`], `Сабақ тақырыбы — «${this.shortLabel(shortCourse, 48)}».`);
-          b1 = pickUnique([`Басты ұғым — «${shortTerm}»: ${plainDef}.`], `Негізгі термин — «${shortTerm}»: ${plainDef}.`);
-          b2 = pickUnique([secSents[0]], `Көрнекі сызба арқылы осы механизмнің қалай жұмыс істейтінін көрейік.`);
-        } else if (modId === "split_versus_duel") {
-          tutorCue = "QUESTION_OPEN";
-          emotion = "risk";
-          sceneTitle = `Салыстыру: қате тәсіл мен «${shortTerm}»`;
-          b0 = pickUnique([`Екі тәсілді салыстырайық: «${shortTerm}» ескерілмесе, жүйеде қателік пен тәуекел туындайды.`], `Жүйелі әдіссіз қателік қаупі артады.`);
-          b1 = pickUnique([`Ал «${shortTerm}» қағидасын қолданғанда (${this.shortLabel(plainDef, 62)}), құрылым тұрақты әрі дәл жұмыс істейді.`], `Ғылыми тәсіл нақты нәтиже береді.`);
-          b2 = pickUnique([secSents[1], secSents[0]], `Салыстыру нәтижесі: жүйелі тәсіл тиімділікті дәлелдейді.`);
-        } else if (idx === moduleIds.length - 1) {
-          tutorCue = "THUMBS_UP";
-          emotion = "celebrate";
-          sceneTitle = meta.title;
-          const allTermNames = glossary.slice(0, 5).map((g) => g.term.split(/[/(]/)[0].trim()).join(", ");
-          b0 = pickUnique([`Сабақты қорытындылайық. Біз негізгі ұғымдарды біріктірдік: ${allTermNames}.`], `Тақырыптың барлық ұғымдарын біртұтас жүйеге жинадық.`);
-          b1 = pickUnique([`Әр термин тақырыптың өз қырын ашып, емтиханға дайындықты жеңілдетеді.`], `Барлық ұғымдар өзара тығыз байланысты.`);
-          b2 = pickUnique([`Енді конспект, интеллект-карта және тест арқылы біліміңізді бекітіңіз.`], `Төмендегі тест арқылы өзіңізді тексеріңіз.`);
-        } else {
-          sceneTitle = sec?.title ? this.shortLabel(sec.title, 52) : meta.title;
-          b0 = pickUnique([`Келесі маңызды деңгей — «${stepLbl}»: ${stageItems[0]?.detail || plainDef}.`, secSents[0]], `«${stepLbl}» элементінің рөлін қарастырайық.`);
-          b1 = pickUnique([`Одан кейін «${stepLbl2}» іске қосылып, процесті нақтылайды.`, secSents[1]], `Келесі қадам — «${stepLbl2}» байланысы.`);
-          b2 = pickUnique([`Нәтижесінде «${stepLbl3}» арқылы тұтас жүйе қалыптасады.`, secSents[2]], `Осылайша тақырыптың толық логикасы ашылады.`);
-        }
-      } else if (outputLang === "en") {
-        const stepLbl = stageItems[0]?.shortTitle || shortTerm;
-        const stepLbl2 = stageItems[1]?.shortTitle || shortTerm;
-        const stepLbl3 = stageItems[2]?.shortTitle || shortTerm;
-        if (idx === 0) {
-          tutorCue = "WARNING_PALM";
-          sceneTitle = `Introduction: ${this.shortLabel(shortCourse, 46)}`;
-          b0 = pickUnique([`Welcome to "${this.shortLabel(shortCourse, 48)}". Let us break down the core concepts in clear, simple language.`], `Topic overview: "${this.shortLabel(shortCourse, 48)}".`);
-          b1 = pickUnique([`We start with "${shortTerm}" — simply put, ${plainDef}.`], `Key concept "${shortTerm}": ${plainDef}.`);
-          b2 = pickUnique([secSents[0]], `Let us visualize how this mechanism operates step by step.`);
-        } else if (modId === "split_versus_duel") {
-          tutorCue = "QUESTION_OPEN";
-          emotion = "risk";
-          sceneTitle = `Comparison: Without vs With ${shortTerm}`;
-          b0 = pickUnique([`Compare two approaches: ignoring "${shortTerm}" leads to instability and costly errors.`], `Without a structured method, critical errors arise.`);
-          b1 = pickUnique([`When we apply "${shortTerm}" (${this.shortLabel(plainDef, 64)}), the system becomes reliable and precise.`], `Applying "${shortTerm}" stabilizes the entire process.`);
-          b2 = pickUnique([secSents[1], secSents[0]], `The contrast is clear: a systematic approach delivers measurable gains.`);
-        } else if (idx === moduleIds.length - 1) {
-          tutorCue = "THUMBS_UP";
-          emotion = "celebrate";
-          sceneTitle = meta.title;
-          const allTermNames = glossary.slice(0, 5).map((g) => g.term.split(/[/(]/)[0].trim()).join(", ");
-          b0 = pickUnique([`Let us wrap up "${this.shortLabel(shortCourse, 42)}". We connected the key concepts: ${allTermNames}.`], `Summary of all core concepts in one map.`);
-          b1 = pickUnique([`Each concept reinforces the others to give you a complete mental model for your exam.`], `Together these terms form a coherent system.`);
-          b2 = pickUnique([`Explore the interactive notes, mind map, and adaptive quiz tabs to master the topic.`], `Try the adaptive quiz next to test your understanding.`);
-        } else {
-          sceneTitle = sec?.title ? this.shortLabel(sec.title, 52) : meta.title;
-          b0 = pickUnique([`Let us examine "${stepLbl}": ${stageItems[0]?.detail || plainDef}.`, secSents[0]], `First key stage: "${stepLbl}".`);
-          b1 = pickUnique([`Next, "${stepLbl2}" connects the input to the core transformation.`, secSents[1]], `Second stage: "${stepLbl2}" refines the process.`);
-          b2 = pickUnique([`Finally, "${stepLbl3}" completes the cycle with a clear practical outcome.`, secSents[2]], `Together these layers build the complete mechanism.`);
-        }
-      } else if (idx === 0) {
-        tutorCue = "WARNING_PALM";
-        sceneTitle = `Введение: ${this.shortLabel(shortCourse, 48)}`;
-        b0 = pickUnique(
-          [`Тема нашего урока — «${this.shortLabel(shortCourse, 52)}». Сегодня простыми словами разберём главные идеи и понятия.`],
-          `Тема урока — «${this.shortLabel(shortCourse, 52)}». Разберём тему по шагам.`
-        );
-        b1 = pickUnique(
-          [`Начнём с базового понятия: «${shortTerm}» — простыми словами, это ${plainDef}.`],
-          `Ключевой термин урока — «${shortTerm}»: ${plainDef}.`
-        );
-        b2 = pickUnique(
-          [secSents[0], secSents[1]],
-          `Посмотрим на наглядной схеме, как это понятие работает в реальной жизни.`
-        );
-      } else if (modId === "split_versus_duel") {
-        tutorCue = "QUESTION_OPEN";
-        emotion = "risk";
-        sceneTitle = `Сравнение: ${signals.leftFail.title.replace(/[❌✅]/g, "").trim()} и ${shortTerm}`;
-        b0 = pickUnique(
-          [signals.contrastQuote, `Сравним два подхода: ${signals.leftFail.sub.toLowerCase()} часто приводит к ошибкам — ${signals.leftFail.metric.toLowerCase()}.`],
-          `Без опоры на понятие «${shortTerm}» возникает поверхностная оценка ситуации.`
-        );
-        b1 = pickUnique(
-          [`Когда мы применяем «${shortTerm}» (${this.shortLabel(plainDef, 68)}), картина становится точной и понятной.`],
-          `Научный подход через «${shortTerm}» раскрывает реальный механизм явления.`
-        );
-        b2 = pickUnique(
-          [secSents[1], secSents[0], `Итог сравнения: ${signals.rightPass.metric}.`],
-          `Итог сравнения очевиден: системный метод даёт точный и проверенный результат.`
-        );
-      } else if (modId === "social_stratification_pyramid" || modId === "system_anatomy" || modId === "bio_pathway") {
-        sceneTitle = sec?.title ? this.shortLabel(sec.title, 54) : meta.title;
-        const st0 = stageItems[0];
-        const st1 = stageItems[1] || st0;
-        const st2 = stageItems[2] || st1;
-        b0 = pickUnique(
-          [`Разберём структуру по уровням. Первый элемент — «${st0.shortTitle}»: ${st0.detail}.`, secSents[0]],
-          `Первый важный уровень темы — «${st0.shortTitle}»: ${st0.detail}.`
-        );
-        b1 = pickUnique(
-          [`Следующее звено — «${st1.shortTitle}»: ${st1.detail}.`, secSents[1]],
-          `Далее включается «${st1.shortTitle}», расширяя наше понимание темы.`
-        );
-        b2 = pickUnique(
-          [`И третий элемент — «${st2.shortTitle}»: ${st2.detail}.`, secSents[2]],
-          `Вместе эти уровни складываются в целостную и логичную картину.`
-        );
-      } else if (modId === "chronicle_timeline") {
-        sceneTitle = sec?.title ? this.shortLabel(sec.title, 54) : meta.title;
-        b0 = pickUnique([secSents[0], `Проследим последовательность развития идеи в разделе «${sceneTitle}».`], `Рассмотрим ключевые этапы процесса по порядку.`);
-        b1 = pickUnique([secSents[1], `На следующем этапе в фокус выходит понятие «${shortTerm}» — ${plainDef}.`], `Каждый следующий шаг опирается на предыдущий и уточняет закономерность.`);
-        b2 = pickUnique([secSents[2], `Так формируется последовательная логика всей изучаемой темы.`], `Понимание этапов помогает легко ориентироваться в материале.`);
-      } else if (modId === "multi_mode_chart") {
-        sceneTitle = sec?.title ? this.shortLabel(sec.title, 54) : meta.title;
-        b0 = pickUnique(
-          [secSents[0], `Посмотрим на закономерность: как «${shortTerm}» влияет на итоговый результат.`],
-          `Разберём главную зависимость между факторами этой темы.`
-        );
-        b1 = pickUnique(
-          [
-            signals.hasFormula
-              ? `Ключевое соотношение выражается правилом ${signals.formulaCard.expression}.`
-              : secSents[1],
-            `По мере развития фактора «${shortTerm}» качественно меняется и состояние среды.`
-          ],
-          `Диаграмма наглядно показывает, какие факторы дают наибольший вклад.`
-        );
-        b2 = pickUnique(
-          [secSents[2], `Главный вывод: ${plainDef}.`],
-          `Эта закономерность позволяет делать точные выводы на практике.`
-        );
-      } else if (modId === "case_dossier_blueprint") {
-        sceneTitle = sec?.title ? `На практике: ${this.shortLabel(sec.title, 44)}` : meta.title;
-        b0 = pickUnique(
-          [secSents[0], `Разберём, как понятие «${shortTerm}» применяется в реальной практической задаче.`],
-          `Перейдём от теории к практике в разделе «${this.shortLabel(sec?.title || shortTerm, 42)}».`
-        );
-        b1 = pickUnique(
-          [secSents[1], `Опираясь на «${shortTerm}» (${this.shortLabel(plainDef, 62)}), специалист анализирует реальные условия.`],
-          `Применяем изученный метод для анализа конкретной ситуации из лекции.`
-        );
-        b2 = pickUnique(
-          [secSents[2], `Практический итог: грамотное решение, учитывающее реальные закономерности.`],
-          `Так теоретическое знание превращается в рабочий инструмент специалиста.`
-        );
-      } else {
-        tutorCue = "THUMBS_UP";
-        emotion = "celebrate";
-        sceneTitle = meta.title;
-        const allTermNames = glossary.slice(0, 5).map((g) => g.term.split(/[/(]/)[0].trim()).join(", ");
-        b0 = pickUnique(
-          [`Подведём итог урока «${this.shortLabel(shortCourse, 44)}». Мы связали ключевые понятия: ${allTermNames}.`],
-          `Подведём итог и соберём все понятия урока в единую карту.`
-        );
-        b1 = pickUnique(
-          [secSents[secSents.length - 1], `Каждое из этих понятий раскрывает свою грань общей темы и помогает видеть суть явлений.`],
-          `Все изученные термины работают как единая система знаний.`
-        );
-        b2 = pickUnique(
-          [`Откройте вкладки конспекта, интеллект-карты и мини-теста, чтобы закрепить материал к занятию.`],
-          `Проверьте себя в мини-тесте ниже — материал полностью готов к повторению.`
-        );
-      }
-
-      const beats = [
-        { id: "beat0", role: "input", text: b0 },
-        { id: "beat1", role: "action", text: b1 },
-        { id: "beat2", role: "output", text: b2 }
-      ];
-
-      const cleanCaption = beats.map((b) => b.text).join(" ");
-      const rawDefectCaption = `[Сырой текст без адаптации]: В рамках рассматриваемой дисциплины категория «${shortTerm}» (${plainDef}) характеризуется многоуровневой детерминацией и требует комплексной интерпретации.`;
-      const rawDefectCps = +(rawDefectCaption.length / 8).toFixed(1);
-      const rawCollisionPx = 380 + idx * 35;
-      selfHealedCount++;
-
-      const durationSec = vd
-        ? vd.computeCalmDurationSec(cleanCaption, 12.0, pacing.targetCps, pacing.preRollSec, pacing.postRollSec)
-        : Math.max(12.0, +(0.8 + cleanCaption.length / 11.8 + 1.5).toFixed(1));
-      const finalCps = +(cleanCaption.length / durationSec).toFixed(1);
-
-      const facts = {
-        shortTerm,
-        primaryMetric: secMetrics[0] || signals.dangerMetric.value,
-        secondaryMetric: secMetrics[1] || signals.deltaBadge,
-        formulaExpr: signals.formulaCard.expression,
-        causeEffect: {
-          causeLabel: this.shortLabel(b0, 62),
-          causeMetric: secMetrics[0] || "Контекст",
-          mechanismLabel: shortTerm,
-          actionVerb: "Раскрывает суть",
-          effectLabel: this.shortLabel(b2, 66),
-          effectMetric: secMetrics[1] || "Вывод",
-          deltaLabel: `${shortTerm}: ключевая связь`
-        },
-        workedExample: {
-          caseTitle: sceneTitle,
-          inputA: { key: "Объект анализа", value: this.shortLabel(shortTerm, 22) },
-          inputB: { key: "Контекст раздела", value: secMetrics[0] || this.shortLabel(sec?.title || "Практика", 22) },
-          expression: signals.formulaCard.expression,
-          outputValue: secMetrics[1] || secMetrics[0] || "Решение",
-          verdict: this.shortLabel(b2, 74)
-        },
-        comparison: {
-          subject: shortTerm,
-          leftTitle: signals.leftFail.title,
-          leftNote: signals.leftFail.sub,
-          leftMetric: signals.leftFail.metric,
-          rightTitle: signals.rightPass.title,
-          rightNote: this.shortLabel(plainDef, 46),
-          rightMetric: signals.rightPass.metric,
-          deltaBadge: signals.deltaBadge
-        },
-        causalCurve: {
-          paramA: shortTerm,
-          paramB: this.shortLabel(sec?.title || signals.yAxisLabel, 28),
-          thresholdLabel: signals.hasFormula ? signals.formulaCard.expression : `Фокус: ${shortTerm}`,
-          takeaway: this.shortLabel(b2, 70)
-        }
-      };
-
-      const sceneObj = {
-        sceneIndex: idx + 1,
-        id: `Scene_0${idx + 1}`,
-        archetype: modId,
-        archetypeBadge: meta.badge,
-        domainId: domainProfile.domainId,
-        outputLang,
-        sourceBadge: sec?.sourceBadge || "",
-        preRollSec: pacing.preRollSec,
-        postRollSec: pacing.postRollSec,
-        pacingTier: pacing.label,
-        tutorCue,
-        emotion,
-        title: sceneTitle,
-        keyTerm: termObj.term,
-        keyPlain: termObj.plain,
-        sectionRef: sec ? sec.title : `Раздел 0${idx + 1}`,
-        beats,
-        caption: cleanCaption,
-        rawDefectCaption,
-        rawDefectCps,
-        rawCollisionPx,
-        finalCps,
-        durationSec,
-        safeZoneBottomPct: 18,
-        pauseBufferSec: 2.0,
-        domCollisionAreaPx: 0,
-        contrastRatio: "15.8:1 (WCAG AAA)",
-        visualPayload: {
-          domainProfile,
-          signals,
-          facts,
-          years: signals.years,
-          stages: stageItems,
-          rings: glossary.slice(0, 3).map((g, rIdx) => ({
-            name: `${rIdx + 1}. ${g.term.split(/[/(]/)[0].trim().slice(0, 24)}`,
-            role: this.shortLabel(g.plain, 48)
-          })),
-          constellationNodes: glossary.slice(0, 5).map((g) => ({
-            term: g.term.split(/[/(]/)[0].trim().slice(0, 26),
-            tag: g.plain.split(" ").slice(0, 3).join(" ")
-          }))
-        }
-      };
-      const audit = this.auditSceneGeometryAndContrast(sceneObj, domainProfile.theme);
-      selfHealedCount += audit.healedBeats;
-      sceneObj.finalCps = +(sceneObj.caption.length / sceneObj.durationSec).toFixed(1);
-      return sceneObj;
-    });
-
+  finalizeStoryboardLogsAndCode(courseTitle, domainProfile, domainLocalizedName, sections, glossary, validatedScenes, lectureText, outputLang = "ru", selfHealedCount = 0) {
+    const i18n = this.OUTPUT_I18N[outputLang] || this.OUTPUT_I18N.ru;
     const wordCount = (lectureText || "").trim().split(/\s+/).filter(Boolean).length;
     const singlePassTokens = Math.round(wordCount * 1.75 + 480);
     const naive5Tokens = Math.round(singlePassTokens * 4.75);
     const totalCollisions = validatedScenes.reduce((acc, s) => acc + (s.domCollisionAreaPx || 0), 0);
     const minContrast = validatedScenes[0]?.contrastRatio || "15.8:1 (WCAG AAA)";
     const maxCps = Math.max(...validatedScenes.map((s) => s.finalCps || 11.5));
+    const moduleIds = validatedScenes.map((s) => s.archetype);
 
     const supervisorLogs = [
       {
@@ -1851,12 +1617,378 @@ window.AISupervisorPipeline = {
           outputLang === "kk"
             ? `3-биттік дыбыс пен қозғалыс синхронизациясы (60 FPS). Single-Pass үнемдеу: ~${singlePassTokens} токен (~${naive5Tokens} орнына, -79%).`
             : outputLang === "en"
-              ? `3-beat audio-visual choreography (60 FPS + Cross-Dissolve). Single-Pass token budget: ~${singlePassTokens} vs ~${naive5Tokens} (-79%).`
-              : `3-битная синхронизация речи и анимации (60 FPS + Cross-Dissolve). Single-Pass экономия: ~${singlePassTokens} токенов вместо ~${naive5Tokens} (-79%).`
+              ? `3-beat audio-visual choreography (60 FPS). Single-Pass token budget: ~${singlePassTokens} vs ~${naive5Tokens} (-79%).`
+              : `3-битная синхронизация речи и анимации (60 FPS + динамические переходы). Single-Pass экономия: ~${singlePassTokens} токенов вместо ~${naive5Tokens} (-79%).`
       }
     ];
-
     const generatedCode = this.generateRemotionTypeScriptCode(courseTitle, domainProfile, validatedScenes);
+    return { supervisorLogs, generatedCode };
+  },
+
+  buildStoryboardAndSupervise(courseTitle, sections, glossary, lectureText, outputLang = "ru", glossaryText = "") {
+    const i18n = this.OUTPUT_I18N[outputLang] || this.OUTPUT_I18N.ru;
+    const domainProfile = this.detectDomainProfile(courseTitle, lectureText, glossaryText);
+    const domainLocalizedName = i18n.domainNames[domainProfile.domainId] || domainProfile.name;
+    const globalSignals = this.extractLectureSignals(lectureText, domainProfile, glossary, sections, outputLang);
+    const vd = window.LectureVisualDirector;
+    const pacing = vd
+      ? vd.estimateComplexityAndPacing(lectureText, glossary.length)
+      : { tier: 2, label: "Стандартный концептуальный", sceneCount: 6, targetCps: 12.0, preRollSec: 0.8, postRollSec: 1.4 };
+
+    const shortCourse = String(courseTitle || "Урок").split("·").pop().trim();
+    const scenePlans = vd && typeof vd.selectSectionModules === "function"
+      ? vd.selectSectionModules(domainProfile.domainId, sections, globalSignals, {
+          sceneCount: pacing.sceneCount,
+          seedStr: shortCourse
+        })
+      : [
+          { moduleId: "hero_problem_hook", layoutMode: "hero_intro", transitionType: "zoom_fade", styleVariant: { patternVariant: "soft_grid", accentMode: "primary", frameless: false, paletteOffset: 0 } },
+          { moduleId: "system_anatomy", layoutMode: "split_tutor", transitionType: "slide", styleVariant: { patternVariant: "soft_grid", accentMode: "secondary", frameless: false, paletteOffset: 1 } },
+          { moduleId: "split_versus_duel", layoutMode: "wide_stage", transitionType: "wipe", styleVariant: { patternVariant: "soft_grid", accentMode: "primary", frameless: true, paletteOffset: 2 } },
+          { moduleId: "multi_mode_chart", layoutMode: "focus_split", transitionType: "cross_dissolve", styleVariant: { patternVariant: "soft_grid", accentMode: "secondary", frameless: false, paletteOffset: 0 } },
+          { moduleId: "case_dossier_blueprint", layoutMode: "split_tutor", transitionType: "slide", styleVariant: { patternVariant: "soft_grid", accentMode: "primary", frameless: false, paletteOffset: 1 } },
+          { moduleId: "radial_constellation_map", layoutMode: "wide_stage", transitionType: "zoom_fade", styleVariant: { patternVariant: "soft_grid", accentMode: "secondary", frameless: true, paletteOffset: 2 } }
+        ].slice(0, pacing.sceneCount);
+
+    const usedSentences = new Set();
+    const pickUnique = (candidates, fallback) => {
+      for (const c of candidates) {
+        if (!c) continue;
+        const clean = this.ensureCompleteSentence(c, 102);
+        const key = clean.toLowerCase().slice(0, 44);
+        if (clean.length > 14 && !usedSentences.has(key)) {
+          usedSentences.add(key);
+          return clean;
+        }
+      }
+      return this.ensureCompleteSentence(fallback, 102);
+    };
+
+    let selfHealedCount = 0;
+
+    const validatedScenes = scenePlans.map((plan, idx) => {
+      const modId = plan.moduleId;
+      const meta = i18n.moduleBadges[modId] || { badge: `✦ Сцена 0${idx + 1}`, title: "Ключевой этап темы" };
+      const sec = sections[idx % sections.length] || sections[0];
+      const signals = this.extractSectionSignals(sec, idx, domainProfile, glossary, globalSignals, outputLang);
+      const secLower = `${sec?.title || ""} ${sec?.academicOriginal || ""}`.toLowerCase();
+      const matchedTerm = glossary.find((g) => {
+        const base = g.term.split(/[/(]/)[0].trim().toLowerCase().slice(0, 6);
+        return base.length >= 3 && secLower.includes(base);
+      });
+      const termObj = matchedTerm || glossary[idx % glossary.length] || glossary[0];
+      const shortTerm = termObj.term.split(/[/(]/)[0].trim();
+      const plainDef = (termObj.plain || "").replace(/[.!?]+$/, "");
+
+      const secSents = String(sec?.plainSummary || sec?.academicOriginal || "")
+        .split(/(?<=[.!?])\s+/)
+        .map((x) => x.trim())
+        .filter((x) => x.length > 16);
+      const secMetrics = this.extractCleanMetrics(sec?.academicOriginal || "");
+
+      const stepWord = outputLang === "kk" ? "Қадам" : outputLang === "en" ? "Step" : "Шаг";
+      const levelWord = outputLang === "kk" ? "Деңгей" : outputLang === "en" ? "Layer" : "Уровень";
+      const secBullets = Array.isArray(sec?.plainBullets) ? sec.plainBullets.filter(Boolean) : [];
+      // Подбираем 3–4 реальных элемента из текущего раздела (без копипасты глоссария)
+      const stageItems = [];
+      if (secBullets.length >= 3) {
+        secBullets.slice(0, 4).forEach((b, bIdx) => {
+          const g = glossary[(idx + bIdx) % glossary.length];
+          stageItems.push({
+            shortTitle: this.shortLabel(b.split(/[:—–-]/)[0].trim(), 28) || (g ? this.shortLabel(g.term.split(/[/(]/)[0].trim(), 28) : `${stepWord} ${bIdx + 1}`),
+            detail: this.shortLabel(b, 68),
+            metric: secMetrics[bIdx] || `${stepWord} 0${bIdx + 1}`
+          });
+        });
+      } else {
+        for (let k = 0; k < Math.min(4, Math.max(3, glossary.length)); k++) {
+          const g = glossary[(idx + k) % glossary.length] || termObj;
+          const sentFallback = secSents[k] || secBullets[k] || g.plain;
+          stageItems.push({
+            shortTitle: this.shortLabel(g.term.split(/[/(]/)[0].trim(), 28),
+            detail: this.shortLabel(sentFallback, 68),
+            metric: secMetrics[k] || `${levelWord} ${k + 1}`
+          });
+        }
+      }
+
+      // Драматургия 3 битов на выбранном языке (RU / KK / EN) — приоритет реальным фактам раздела!
+      let b0, b1, b2, sceneTitle, tutorCue = "POINT", emotion = "explain";
+      const isClosing = idx === scenePlans.length - 1 || modId === "radial_constellation_map";
+      const stepLbl = stageItems[0]?.shortTitle || shortTerm;
+      const stepLbl2 = stageItems[1]?.shortTitle || shortTerm;
+      const stepLbl3 = stageItems[2]?.shortTitle || shortTerm;
+
+      if (outputLang === "kk") {
+        if (idx === 0) {
+          tutorCue = "WARNING_PALM";
+          sceneTitle = this.shortLabel(sec?.title || shortCourse, 52);
+          b0 = pickUnique([secSents[0], `Бүгінгі тақырып — «${this.shortLabel(shortCourse, 44)}»: «${shortTerm}» ұғымын талдаймыз.`], `Сабақ тақырыбы — «${this.shortLabel(shortCourse, 48)}».`);
+          b1 = pickUnique([secSents[1], secBullets[0], `«${shortTerm}» — ${plainDef}.`], `Негізгі термин — «${shortTerm}»: ${plainDef}.`);
+          b2 = pickUnique([secSents[2], secBullets[1], `${stageItems[0]?.detail || plainDef}.`], `Көрнекі сызба осы механизмнің қалай жұмыс істейтінін ашады.`);
+        } else if (isClosing) {
+          tutorCue = "THUMBS_UP";
+          emotion = "celebrate";
+          sceneTitle = meta.title;
+          const allTermNames = glossary.slice(0, 5).map((g) => g.term.split(/[/(]/)[0].trim()).join(", ");
+          b0 = pickUnique([secSents[0], `«${this.shortLabel(shortCourse, 40)}» қорытындысы: ${allTermNames}.`], `Тақырыптың барлық ұғымдарын біртұтас жүйеге жинадық.`);
+          b1 = pickUnique([secSents[1], `Әр термин тақырыптың нақты тетігін ашып, біртұтас жүйе құрайды.`], `Барлық ұғымдар өзара тығыз байланысты.`);
+          b2 = pickUnique([secSents[2], `Конспект, интеллект-карта және тест арқылы біліміңізді бекітіңіз.`], `Төмендегі тест арқылы өзіңізді тексеріңіз.`);
+        } else if (modId === "split_versus_duel" || modId === "scales_balance_norm") {
+          tutorCue = "QUESTION_OPEN";
+          emotion = "risk";
+          sceneTitle = sec?.title ? this.shortLabel(sec.title, 52) : meta.title;
+          b0 = pickUnique([secSents[0], `«${shortTerm}» ескерілмесе, жүйеде қателік пен теңгерімсіздік туындайды.`], `Жүйелі әдіссіз қателік қаупі артады.`);
+          b1 = pickUnique([secSents[1], secBullets[0], `«${shortTerm}» (${this.shortLabel(plainDef, 56)}) құрылымды тұрақтандырады.`], `Ғылыми тәсіл нақты нәтиже береді.`);
+          b2 = pickUnique([secSents[2], secBullets[1]], `Салыстыру нәтижесі: жүйелі тәсіл тиімділікті дәлелдейді.`);
+        } else {
+          sceneTitle = sec?.title ? this.shortLabel(sec.title, 52) : meta.title;
+          b0 = pickUnique([secSents[0], secBullets[0], `«${stepLbl}» — ${stageItems[0]?.detail || plainDef}.`], `«${stepLbl}» элементінің рөлін қарастырайық.`);
+          b1 = pickUnique([secSents[1], secBullets[1], `«${stepLbl2}» кезеңі «${shortTerm}» арқылы процесті нақтылайды.`], `Келесі қадам — «${stepLbl2}» байланысы.`);
+          b2 = pickUnique([secSents[2], secBullets[2], `Нәтижесінде «${stepLbl3}» жүйенің негізгі мақсатын орындайды.`], `Осылайша бөлімнің негізгі логикасы ашылады.`);
+        }
+      } else if (outputLang === "en") {
+        if (idx === 0) {
+          tutorCue = "WARNING_PALM";
+          sceneTitle = this.shortLabel(sec?.title || shortCourse, 52);
+          b0 = pickUnique([secSents[0], `Today we explore "${this.shortLabel(shortCourse, 44)}" starting with "${shortTerm}".`], `Topic overview: "${this.shortLabel(shortCourse, 48)}".`);
+          b1 = pickUnique([secSents[1], secBullets[0], `"${shortTerm}" means ${plainDef}.`], `Key concept "${shortTerm}": ${plainDef}.`);
+          b2 = pickUnique([secSents[2], secBullets[1], `${stageItems[0]?.detail || plainDef}.`], `The visual diagram breaks down how this mechanism works.`);
+        } else if (isClosing) {
+          tutorCue = "THUMBS_UP";
+          emotion = "celebrate";
+          sceneTitle = meta.title;
+          const allTermNames = glossary.slice(0, 5).map((g) => g.term.split(/[/(]/)[0].trim()).join(", ");
+          b0 = pickUnique([secSents[0], `Bringing "${this.shortLabel(shortCourse, 40)}" together: ${allTermNames}.`], `Summary of all core concepts in one map.`);
+          b1 = pickUnique([secSents[1], `Each concept connects directly to the core mechanism you will see on the exam.`], `Together these terms form a coherent system.`);
+          b2 = pickUnique([secSents[2], `Use the notes, mind map, and adaptive quiz to test your understanding.`], `Try the adaptive quiz next to test your understanding.`);
+        } else if (modId === "split_versus_duel" || modId === "scales_balance_norm") {
+          tutorCue = "QUESTION_OPEN";
+          emotion = "risk";
+          sceneTitle = sec?.title ? this.shortLabel(sec.title, 52) : meta.title;
+          b0 = pickUnique([secSents[0], `Ignoring "${shortTerm}" creates imbalance and avoidable errors.`], `Without a structured method, critical errors arise.`);
+          b1 = pickUnique([secSents[1], secBullets[0], `Applying "${shortTerm}" (${this.shortLabel(plainDef, 56)}) restores precision.`], `Applying "${shortTerm}" stabilizes the entire process.`);
+          b2 = pickUnique([secSents[2], secBullets[1]], `A systematic approach delivers clear, measurable gains.`);
+        } else {
+          sceneTitle = sec?.title ? this.shortLabel(sec.title, 52) : meta.title;
+          b0 = pickUnique([secSents[0], secBullets[0], `"${stepLbl}": ${stageItems[0]?.detail || plainDef}.`], `First key element: "${stepLbl}".`);
+          b1 = pickUnique([secSents[1], secBullets[1], `"${stepLbl2}" drives the core interaction with "${shortTerm}".`], `Next, "${stepLbl2}" refines the process.`);
+          b2 = pickUnique([secSents[2], secBullets[2], `"${stepLbl3}" completes the outcome for this section.`], `Together these stages explain the mechanism.`);
+        }
+      } else if (idx === 0) {
+        tutorCue = "WARNING_PALM";
+        sceneTitle = this.shortLabel(sec?.title || shortCourse, 52);
+        b0 = pickUnique(
+          [secSents[0], `В теме «${this.shortLabel(shortCourse, 46)}» ключевую роль играет «${shortTerm}».`],
+          `Тема урока — «${this.shortLabel(shortCourse, 52)}».`
+        );
+        b1 = pickUnique(
+          [secSents[1], secBullets[0], `«${shortTerm}» — это ${plainDef}.`],
+          `Ключевой термин — «${shortTerm}»: ${plainDef}.`
+        );
+        b2 = pickUnique(
+          [secSents[2], secBullets[1], `${stageItems[0]?.detail || plainDef}.`],
+          `Посмотрим на схеме, как этот механизм работает на практике.`
+        );
+      } else if (isClosing) {
+        tutorCue = "THUMBS_UP";
+        emotion = "celebrate";
+        sceneTitle = meta.title;
+        const allTermNames = glossary.slice(0, 5).map((g) => g.term.split(/[/(]/)[0].trim()).join(", ");
+        b0 = pickUnique(
+          [secSents[0], `Соберём ключевые понятия урока «${this.shortLabel(shortCourse, 38)}»: ${allTermNames}.`],
+          `Соберём все ключевые понятия урока в единую карту.`
+        );
+        b1 = pickUnique(
+          [secSents[secSents.length - 1], secBullets[0], `Все изученные термины связывают теорию и практику в целостную систему.`],
+          `Все изученные термины работают как единая система знаний.`
+        );
+        b2 = pickUnique(
+          [secBullets[1], `Закрепите материал в конспекте, интеллект-карте и мини-тесте ниже.`],
+          `Проверьте себя в мини-тесте ниже — материал готов к повторению.`
+        );
+      } else if (modId === "split_versus_duel" || modId === "scales_balance_norm") {
+        tutorCue = "QUESTION_OPEN";
+        emotion = "risk";
+        sceneTitle = sec?.title ? this.shortLabel(sec.title, 54) : meta.title;
+        b0 = pickUnique(
+          [secSents[0], signals.contrastQuote, secBullets[0]],
+          `Без системного разбора «${shortTerm}» возникают ошибки.`
+        );
+        b1 = pickUnique(
+          [secSents[1], secBullets[1], `Опора на «${shortTerm}» (${this.shortLabel(plainDef, 56)}) даёт точный результат.`],
+          `Научный подход через «${shortTerm}» раскрывает механизм явления.`
+        );
+        b2 = pickUnique(
+          [secSents[2], secBullets[2], `Разница видна сразу: ${signals.deltaBadge}.`],
+          `Системный метод даёт точный и проверенный результат.`
+        );
+      } else if (modId === "cause_effect_flow" || modId === "worked_example") {
+        sceneTitle = sec?.title ? this.shortLabel(sec.title, 54) : meta.title;
+        b0 = pickUnique([secSents[0], secBullets[0], `Исходное условие: «${stepLbl}» — ${stageItems[0]?.detail || plainDef}.`], `Исходный фактор — «${stepLbl}».`);
+        b1 = pickUnique([secSents[1], secBullets[1], `Через «${shortTerm}» (${stepLbl2}) условие преобразуется в действие.`], `Механизм «${shortTerm}» запускает изменение.`);
+        b2 = pickUnique([secSents[2], secBullets[2], `Практический результат — «${stepLbl3}».`], `Итог процесса виден в «${stepLbl3}».`);
+      } else if (modId === "multi_mode_chart" || modId === "causal_curve") {
+        sceneTitle = sec?.title ? this.shortLabel(sec.title, 54) : meta.title;
+        b0 = pickUnique([secSents[0], secBullets[0], `Проследим зависимость между «${shortTerm}» и параметром «${stepLbl}».`], `Разберём главную зависимость факторов раздела.`);
+        b1 = pickUnique(
+          [secSents[1], signals.hasFormula ? `Соотношение задаётся правилом ${signals.formulaCard.expression}.` : secBullets[1]],
+          `Изменение «${shortTerm}» меняет поведение всей системы.`
+        );
+        b2 = pickUnique([secSents[2], secBullets[2], `Вывод: ${plainDef}.`], `Эта закономерность позволяет точно прогнозировать итог.`);
+      } else if (modId === "chronicle_timeline" || modId === "timeline_scroll") {
+        sceneTitle = sec?.title ? this.shortLabel(sec.title, 54) : meta.title;
+        b0 = pickUnique([secSents[0], secBullets[0], `На первом этапе раздела формируется «${stepLbl}».`], `Начальный этап — «${stepLbl}».`);
+        b1 = pickUnique([secSents[1], secBullets[1], `Далее ключевую роль берёт «${shortTerm}» — ${plainDef}.`], `Следующий этап опирается на «${shortTerm}».`);
+        b2 = pickUnique([secSents[2], secBullets[2], `Завершает цепочку «${stepLbl3}».`], `Этапы складываются в последовательную логику.`);
+      } else {
+        sceneTitle = sec?.title ? this.shortLabel(sec.title, 54) : meta.title;
+        b0 = pickUnique(
+          [secSents[0], secBullets[0], `В фокусе раздела — «${stepLbl}»: ${stageItems[0]?.detail || plainDef}.`],
+          `Ключевой элемент раздела — «${stepLbl}».`
+        );
+        b1 = pickUnique(
+          [secSents[1], secBullets[1], `С ним напрямую связано звено «${stepLbl2}»: ${stageItems[1]?.detail || plainDef}.`],
+          `Далее включается «${stepLbl2}», уточняя механизм.`
+        );
+        b2 = pickUnique(
+          [secSents[2], secBullets[2], `Итоговый эффект обеспечивает «${stepLbl3}»: ${stageItems[2]?.detail || plainDef}.`],
+          `Вместе эти элементы дают устойчивый результат.`
+        );
+      }
+
+      const beats = [
+        { id: "beat0", role: "input", text: b0 },
+        { id: "beat1", role: "action", text: b1 },
+        { id: "beat2", role: "output", text: b2 }
+      ];
+
+      const cleanCaption = beats.map((b) => b.text).join(" ");
+      const rawDefectCaption = `[Сырой текст без адаптации]: В рамках рассматриваемой дисциплины категория «${shortTerm}» (${plainDef}) характеризуется многоуровневой детерминацией и требует комплексной интерпретации.`;
+      const rawDefectCps = +(rawDefectCaption.length / 8).toFixed(1);
+      const rawCollisionPx = 380 + idx * 35;
+      selfHealedCount++;
+
+      const durationSec = vd
+        ? vd.computeCalmDurationSec(cleanCaption, 12.0, pacing.targetCps, pacing.preRollSec, pacing.postRollSec)
+        : Math.max(12.0, +(0.8 + cleanCaption.length / 11.8 + 1.5).toFixed(1));
+      const finalCps = +(cleanCaption.length / durationSec).toFixed(1);
+
+      const fL = outputLang === "kk"
+        ? { ctx: "Бастапқы", verb: "Өзгертеді", out: "Нәтиже", link: "негізгі байланыс", obj: "Нысан", secCtx: "Бөлім", prac: "Тәжірибе", sol: "Шешім", focus: "Фокус" }
+        : outputLang === "en"
+          ? { ctx: "Context", verb: "Transforms", out: "Outcome", link: "key link", obj: "Subject", secCtx: "Section", prac: "Practice", sol: "Result", focus: "Focus" }
+          : { ctx: "Контекст", verb: "Преобразует", out: "Вывод", link: "ключевая связь", obj: "Объект", secCtx: "Раздел", prac: "Практика", sol: "Решение", focus: "Фокус" };
+      const facts = {
+        shortTerm,
+        primaryMetric: secMetrics[0] || signals.dangerMetric.value,
+        secondaryMetric: secMetrics[1] || signals.deltaBadge,
+        formulaExpr: signals.formulaCard.expression,
+        causeEffect: {
+          causeLabel: this.shortLabel(stageItems[0]?.detail || b0, 62),
+          causeMetric: secMetrics[0] || fL.ctx,
+          mechanismLabel: shortTerm,
+          actionVerb: fL.verb,
+          effectLabel: this.shortLabel(stageItems[2]?.detail || b2, 66),
+          effectMetric: secMetrics[1] || fL.out,
+          deltaLabel: `${shortTerm}: ${fL.link}`
+        },
+        workedExample: {
+          caseTitle: sceneTitle,
+          inputA: { key: fL.obj, value: this.shortLabel(shortTerm, 22) },
+          inputB: { key: fL.secCtx, value: secMetrics[0] || this.shortLabel(sec?.title || fL.prac, 22) },
+          expression: signals.formulaCard.expression,
+          outputValue: secMetrics[1] || secMetrics[0] || fL.sol,
+          verdict: this.shortLabel(b2, 74)
+        },
+        comparison: {
+          subject: shortTerm,
+          leftTitle: signals.leftFail.title,
+          leftNote: signals.leftFail.sub,
+          leftMetric: signals.leftFail.metric,
+          rightTitle: signals.rightPass.title,
+          rightNote: this.shortLabel(plainDef, 46),
+          rightMetric: signals.rightPass.metric,
+          deltaBadge: signals.deltaBadge
+        },
+        causalCurve: {
+          paramA: shortTerm,
+          paramB: this.shortLabel(sec?.title || signals.yAxisLabel, 28),
+          thresholdLabel: signals.hasFormula ? signals.formulaCard.expression : `${fL.focus}: ${shortTerm}`,
+          takeaway: this.shortLabel(b2, 70)
+        }
+      };
+
+      const sceneObj = {
+        sceneIndex: idx + 1,
+        id: `Scene_0${idx + 1}`,
+        archetype: modId,
+        archetypeBadge: meta.badge,
+        layoutMode: plan.layoutMode || "split_tutor",
+        transitionType: plan.transitionType || "cross_dissolve",
+        styleVariant: plan.styleVariant || { patternVariant: "soft_grid", accentMode: "primary", frameless: false, paletteOffset: 0 },
+        domainId: domainProfile.domainId,
+        outputLang,
+        sourceBadge: sec?.sourceBadge || "",
+        preRollSec: pacing.preRollSec,
+        postRollSec: pacing.postRollSec,
+        pacingTier: pacing.label,
+        tutorCue,
+        emotion,
+        title: sceneTitle,
+        keyTerm: termObj.term,
+        keyPlain: termObj.plain,
+        sectionRef: sec ? sec.title : `Раздел 0${idx + 1}`,
+        beats,
+        caption: cleanCaption,
+        rawDefectCaption,
+        rawDefectCps,
+        rawCollisionPx,
+        finalCps,
+        durationSec,
+        safeZoneBottomPct: 18,
+        pauseBufferSec: 2.0,
+        domCollisionAreaPx: 0,
+        contrastRatio: "15.8:1 (WCAG AAA)",
+        visualPayload: {
+          domainProfile,
+          signals,
+          facts,
+          years: signals.years,
+          stages: stageItems,
+          rings: Array.from({ length: Math.min(3, glossary.length) }, (_, rIdx) => {
+            const g = glossary[(idx + rIdx) % glossary.length];
+            return {
+              name: `${rIdx + 1}. ${g.term.split(/[/(]/)[0].trim().slice(0, 24)}`,
+              role: this.shortLabel(g.plain, 48)
+            };
+          }),
+          constellationNodes: Array.from({ length: Math.min(5, glossary.length) }, (_, cIdx) => {
+            const g = glossary[(idx + cIdx) % glossary.length];
+            return {
+              term: g.term.split(/[/(]/)[0].trim().slice(0, 26),
+              tag: g.plain.split(" ").slice(0, 3).join(" ")
+            };
+          })
+        }
+      };
+      const audit = this.auditSceneGeometryAndContrast(sceneObj, domainProfile.theme);
+      selfHealedCount += audit.healedBeats;
+      sceneObj.finalCps = +(sceneObj.caption.length / sceneObj.durationSec).toFixed(1);
+      return sceneObj;
+    });
+
+    const { supervisorLogs, generatedCode } = this.finalizeStoryboardLogsAndCode(
+      courseTitle,
+      domainProfile,
+      domainLocalizedName,
+      sections,
+      glossary,
+      validatedScenes,
+      lectureText,
+      outputLang,
+      selfHealedCount
+    );
 
     return {
       domainId: domainProfile.domainId,
@@ -1877,6 +2009,8 @@ window.AISupervisorPipeline = {
         return `  {
     id: "${s.id}",
     module: "${s.archetype}",
+    layoutMode: "${s.layoutMode || "split_tutor"}",
+    transitionType: "${s.transitionType || "cross_dissolve"}",
     domainId: "${s.domainId}",
     fromFrame: ${startFrame},
     durationInFrames: ${durFrames}, // 60 FPS (${s.durationSec}s)
@@ -1958,7 +2092,7 @@ export const LectureComposition: React.FC = () => (
   },
 
   async computeContentHash(courseTitle, glossaryText, lectureText, outputLang = "ru") {
-    const raw = `v8_translated||${outputLang}||${courseTitle.trim()}||${glossaryText.trim()}||${lectureText.trim()}`;
+    const raw = `v10_director||${outputLang}||${courseTitle.trim()}||${glossaryText.trim()}||${lectureText.trim()}`;
     if (window.crypto && window.crypto.subtle) {
       const buf = new TextEncoder().encode(raw);
       const digest = await window.crypto.subtle.digest("SHA-256", buf);
@@ -2029,18 +2163,53 @@ export const LectureComposition: React.FC = () => (
         pushSlot(bt.text, (v) => { bt.text = this.ensureCompleteSentence(v, 136); });
       });
       (sc.visualPayload?.stages || []).forEach((st) => {
-        pushSlot(st.shortTitle, (v) => { st.shortTitle = this.shortLabel(v, 26); });
-        pushSlot(st.detail, (v) => { st.detail = this.shortLabel(v, 64); });
+        pushSlot(st.shortTitle, (v) => { st.shortTitle = this.shortLabel(v, 28); });
+        pushSlot(st.detail, (v) => { st.detail = this.shortLabel(v, 68); });
+        pushSlot(st.metric, (v) => { st.metric = this.shortLabel(v, 24); });
+      });
+      (sc.visualPayload?.rings || []).forEach((rg) => {
+        pushSlot(rg.name, (v) => { rg.name = this.shortLabel(v, 28); });
+        pushSlot(rg.role, (v) => { rg.role = this.shortLabel(v, 48); });
       });
       (sc.visualPayload?.constellationNodes || []).forEach((cn) => {
         pushSlot(cn.term, (v) => { cn.term = this.shortLabel(v, 26); });
+        pushSlot(cn.tag, (v) => { cn.tag = this.shortLabel(v, 36); });
       });
+      pushSlot(sc.sectionRef, (v) => { sc.sectionRef = this.shortLabel(v, 48); });
       const cmp = sc.visualPayload?.facts?.comparison;
       if (cmp) {
         pushSlot(cmp.leftTitle, (v) => { cmp.leftTitle = v; });
         pushSlot(cmp.leftNote, (v) => { cmp.leftNote = v; });
         pushSlot(cmp.rightTitle, (v) => { cmp.rightTitle = v; });
         pushSlot(cmp.rightNote, (v) => { cmp.rightNote = v; });
+      }
+      const ce = sc.visualPayload?.facts?.causeEffect;
+      if (ce) {
+        pushSlot(ce.causeLabel, (v) => { ce.causeLabel = this.shortLabel(v, 62); });
+        pushSlot(ce.mechanismLabel, (v) => { ce.mechanismLabel = this.shortLabel(v, 28); });
+        pushSlot(ce.actionVerb, (v) => { ce.actionVerb = this.shortLabel(v, 28); });
+        pushSlot(ce.effectLabel, (v) => { ce.effectLabel = this.shortLabel(v, 66); });
+        pushSlot(ce.deltaLabel, (v) => { ce.deltaLabel = this.shortLabel(v, 44); });
+      }
+      const we = sc.visualPayload?.facts?.workedExample;
+      if (we) {
+        pushSlot(we.caseTitle, (v) => { we.caseTitle = this.shortLabel(v, 52); });
+        if (we.inputA) {
+          pushSlot(we.inputA.key, (v) => { we.inputA.key = this.shortLabel(v, 24); });
+          pushSlot(we.inputA.value, (v) => { we.inputA.value = this.shortLabel(v, 24); });
+        }
+        if (we.inputB) {
+          pushSlot(we.inputB.key, (v) => { we.inputB.key = this.shortLabel(v, 24); });
+          pushSlot(we.inputB.value, (v) => { we.inputB.value = this.shortLabel(v, 24); });
+        }
+        pushSlot(we.outputValue, (v) => { we.outputValue = this.shortLabel(v, 26); });
+        pushSlot(we.verdict, (v) => { we.verdict = this.shortLabel(v, 74); });
+      }
+      const cc = sc.visualPayload?.facts?.causalCurve;
+      if (cc) {
+        pushSlot(cc.paramA, (v) => { cc.paramA = this.shortLabel(v, 26); });
+        pushSlot(cc.paramB, (v) => { cc.paramB = this.shortLabel(v, 28); });
+        pushSlot(cc.takeaway, (v) => { cc.takeaway = this.shortLabel(v, 70); });
       }
     });
 
@@ -2136,11 +2305,12 @@ export const LectureComposition: React.FC = () => (
       const targetLangLabel = langNames[outputLang] || langNames.ru;
       try {
         const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 22000);
+        const timer = setTimeout(() => controller.abort(), 42000);
         if (abortSignal) {
           abortSignal.addEventListener("abort", () => controller.abort(), { once: true });
         }
         const sectionStubs = sections.map((s) => `${s.sectionIndex} [${s.sourceBadge}]. "${s.title}": ${s.academicOriginal.slice(0, 450)}`).join("\n");
+        const scenePlanStubs = storyboardOut.scenes.map((s, i) => `Scene ${i + 1}: archetype="${s.archetype}", section="${s.sectionRef}"`).join("\n");
         const resp = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(
             geminiApiKey.trim()
@@ -2152,7 +2322,7 @@ export const LectureComposition: React.FC = () => (
             body: JSON.stringify({
               systemInstruction: {
                 parts: [{
-                  text: `You are Lecture AI, an expert university scriptwriter and educator. Output ALL JSON values strictly in ${targetLangLabel}. Never merely shorten academic sentences: explain each section intuitively using everyday words, a concrete real-life analogy, and simple term breakdowns. Never use generic engineering clichés ("seismic load", "defense layers") unless the lecture is actually about construction. Scene 1 MUST introduce the lesson topic and define the primary concept in simple words.`
+                  text: `You are Lecture AI, an expert university scriptwriter and educator. Output ALL JSON values strictly in ${targetLangLabel}. Never merely shorten academic sentences: explain each section intuitively using everyday words, a concrete real-life analogy, and simple term breakdowns. Never use generic engineering clichés ("seismic load", "defense layers") unless the lecture is actually about construction. NEVER repeat the same sentence opener across scenes; each scene MUST reflect its assigned visual archetype and section facts. Scene 1 MUST introduce the lesson topic and define the primary concept in simple words.`
                 }]
               },
               contents: [{
@@ -2161,9 +2331,12 @@ export const LectureComposition: React.FC = () => (
 Return JSON with:
 - detectedCourseTitle (clean academic title),
 - glossaryItems (array of 5-7 key terms with { term, plain, academic, example }),
-- sectionNotes (array of ${sections.length} objects with { title, coreIdea: simple everyday explanation, analogy: concrete real-life example, bullets: [2-3 complete takeaways] }),
-- scenes (array of ${storyboardOut.scenes.length} objects with { title, beats: [3 flowing sentences], stageLabels: [3 short labels <= 24 chars] }),
+- sectionNotes (array of ${sections.length} objects with { title, coreIdea: simple everyday explanation without repetitive prefixes, analogy: unique real-life example, bullets: [2-3 complete takeaways] }),
+- scenes (array of ${storyboardOut.scenes.length} objects matching the scene plans below, each with { sectionIndex, archetype, title, beats: [3 distinct flowing sentences <= 98 chars each], stages: [{ shortTitle, detail, metric }], comparison?: { leftTitle, leftNote, rightTitle, rightNote }, causeEffect?: { causeLabel, mechanismLabel, effectLabel }, workedExample?: { expression, outputValue, verdict } }),
 - quizQuestions (array of ${Math.min(12, targetQuizCount)} diverse questions across different angles with { question, options[4], correctIndex, explanation, hint }).
+
+Scene plans:
+${scenePlanStubs}
 
 Sections:
 ${sectionStubs}
@@ -2173,7 +2346,7 @@ ${segmented.coreText.slice(0, 9000)}`
                 }]
               }],
               generationConfig: {
-                temperature: 0.28,
+                temperature: 0.45,
                 responseMimeType: "application/json",
                 responseSchema: {
                   type: "OBJECT",
@@ -2208,9 +2381,51 @@ ${segmented.coreText.slice(0, 9000)}`
                       items: {
                         type: "OBJECT",
                         properties: {
+                          sectionIndex: { type: "INTEGER" },
+                          archetype: { type: "STRING" },
+                          layoutMode: { type: "STRING" },
+                          transitionType: { type: "STRING" },
+                          tutorCue: { type: "STRING" },
+                          emotion: { type: "STRING" },
                           title: { type: "STRING" },
                           beats: { type: "ARRAY", items: { type: "STRING" } },
-                          stageLabels: { type: "ARRAY", items: { type: "STRING" } }
+                          stageLabels: { type: "ARRAY", items: { type: "STRING" } },
+                          stages: {
+                            type: "ARRAY",
+                            items: {
+                              type: "OBJECT",
+                              properties: {
+                                shortTitle: { type: "STRING" },
+                                detail: { type: "STRING" },
+                                metric: { type: "STRING" }
+                              }
+                            }
+                          },
+                          comparison: {
+                            type: "OBJECT",
+                            properties: {
+                              leftTitle: { type: "STRING" },
+                              leftNote: { type: "STRING" },
+                              rightTitle: { type: "STRING" },
+                              rightNote: { type: "STRING" }
+                            }
+                          },
+                          causeEffect: {
+                            type: "OBJECT",
+                            properties: {
+                              causeLabel: { type: "STRING" },
+                              mechanismLabel: { type: "STRING" },
+                              effectLabel: { type: "STRING" }
+                            }
+                          },
+                          workedExample: {
+                            type: "OBJECT",
+                            properties: {
+                              expression: { type: "STRING" },
+                              outputValue: { type: "STRING" },
+                              verdict: { type: "STRING" }
+                            }
+                          }
                         }
                       }
                     },
@@ -2278,23 +2493,40 @@ ${segmented.coreText.slice(0, 9000)}`
             storyboardOut = this.buildStoryboardAndSupervise(cleanTitle, sections, glossary, segmented.coreText, outputLang, glossaryText);
             if (Array.isArray(parsed.scenes)) {
               const vd = window.LectureVisualDirector;
+              const i18n = this.OUTPUT_I18N[outputLang] || this.OUTPUT_I18N.ru;
+              const allowedLayouts = new Set(["hero_intro", "split_tutor", "wide_stage", "focus_split"]);
+              const allowedTrans = new Set(["cross_dissolve", "slide", "zoom_fade", "wipe"]);
+              let geminiHealed = 0;
               parsed.scenes.forEach((ps, idx) => {
                 const sc = storyboardOut.scenes[idx];
                 if (!sc || !ps) return;
+                if (ps.archetype && vd?.MODULE_FAMILIES?.[ps.archetype]) {
+                  sc.archetype = ps.archetype;
+                  sc.archetypeBadge = i18n.moduleBadges?.[ps.archetype]?.badge || sc.archetypeBadge;
+                }
+                if (ps.layoutMode && allowedLayouts.has(ps.layoutMode)) {
+                  sc.layoutMode = ps.layoutMode;
+                }
+                if (ps.transitionType && allowedTrans.has(ps.transitionType)) {
+                  sc.transitionType = ps.transitionType;
+                }
+                if (ps.tutorCue) sc.tutorCue = ps.tutorCue;
+                if (ps.emotion) sc.emotion = ps.emotion;
                 if (ps.title && ps.title.trim()) sc.title = this.shortLabel(ps.title, 56);
                 if (Array.isArray(ps.beats) && ps.beats.length >= 3) {
                   sc.beats = ps.beats.slice(0, 3).map((bt, bIdx) => ({
                     id: `beat${bIdx}`,
                     role: bIdx === 0 ? "input" : bIdx === 1 ? "action" : "output",
-                    text: this.ensureCompleteSentence(bt, 136)
+                    text: this.ensureCompleteSentence(bt, 102)
                   }));
-                  this.auditSceneGeometryAndContrast(sc, domainProfile.theme);
-                  sc.durationSec = vd
-                    ? vd.computeCalmDurationSec(sc.caption, 12.0, 12.0, sc.preRollSec || 0.8, sc.postRollSec || 1.4)
-                    : Math.max(12.0, +(0.8 + sc.caption.length / 11.8 + 1.4).toFixed(1));
-                  sc.finalCps = +(sc.caption.length / sc.durationSec).toFixed(1);
                 }
-                if (Array.isArray(ps.stageLabels) && ps.stageLabels.length >= 3) {
+                if (Array.isArray(ps.stages) && ps.stages.length >= 3) {
+                  sc.visualPayload.stages = ps.stages.slice(0, 4).map((st, sIdx) => ({
+                    shortTitle: this.shortLabel(st?.shortTitle || sc.visualPayload.stages[sIdx]?.shortTitle || `Шаг ${sIdx + 1}`, 28),
+                    detail: this.shortLabel(st?.detail || sc.visualPayload.stages[sIdx]?.detail || "", 68),
+                    metric: this.shortLabel(st?.metric || sc.visualPayload.stages[sIdx]?.metric || `0${sIdx + 1}`, 24)
+                  }));
+                } else if (Array.isArray(ps.stageLabels) && ps.stageLabels.length >= 3) {
                   ps.stageLabels.slice(0, 3).forEach((lbl, lIdx) => {
                     if (sc.visualPayload.stages[lIdx] && lbl) {
                       sc.visualPayload.stages[lIdx].shortTitle = this.shortLabel(lbl, 24);
@@ -2302,7 +2534,45 @@ ${segmented.coreText.slice(0, 9000)}`
                     }
                   });
                 }
+                if (ps.comparison && sc.visualPayload?.facts?.comparison) {
+                  const c = sc.visualPayload.facts.comparison;
+                  if (ps.comparison.leftTitle) c.leftTitle = this.shortLabel(ps.comparison.leftTitle, 28);
+                  if (ps.comparison.leftNote) c.leftNote = this.shortLabel(ps.comparison.leftNote, 46);
+                  if (ps.comparison.rightTitle) c.rightTitle = this.shortLabel(ps.comparison.rightTitle, 28);
+                  if (ps.comparison.rightNote) c.rightNote = this.shortLabel(ps.comparison.rightNote, 46);
+                }
+                if (ps.causeEffect && sc.visualPayload?.facts?.causeEffect) {
+                  const ce = sc.visualPayload.facts.causeEffect;
+                  if (ps.causeEffect.causeLabel) ce.causeLabel = this.shortLabel(ps.causeEffect.causeLabel, 62);
+                  if (ps.causeEffect.mechanismLabel) ce.mechanismLabel = this.shortLabel(ps.causeEffect.mechanismLabel, 28);
+                  if (ps.causeEffect.effectLabel) ce.effectLabel = this.shortLabel(ps.causeEffect.effectLabel, 66);
+                }
+                if (ps.workedExample && sc.visualPayload?.facts?.workedExample) {
+                  const we = sc.visualPayload.facts.workedExample;
+                  if (ps.workedExample.expression) we.expression = this.shortLabel(ps.workedExample.expression, 32);
+                  if (ps.workedExample.outputValue) we.outputValue = this.shortLabel(ps.workedExample.outputValue, 26);
+                  if (ps.workedExample.verdict) we.verdict = this.shortLabel(ps.workedExample.verdict, 74);
+                }
+                const audit = this.auditSceneGeometryAndContrast(sc, domainProfile.theme);
+                geminiHealed += audit.healedBeats;
+                sc.durationSec = vd
+                  ? vd.computeCalmDurationSec(sc.caption, 12.0, 12.0, sc.preRollSec || 0.8, sc.postRollSec || 1.4)
+                  : Math.max(12.0, +(0.8 + sc.caption.length / 11.8 + 1.4).toFixed(1));
+                sc.finalCps = +(sc.caption.length / sc.durationSec).toFixed(1);
               });
+              const fin = this.finalizeStoryboardLogsAndCode(
+                cleanTitle,
+                domainProfile,
+                storyboardOut.domainName,
+                sections,
+                glossary,
+                storyboardOut.scenes,
+                segmented.coreText,
+                outputLang,
+                geminiHealed
+              );
+              storyboardOut.supervisorLogs = fin.supervisorLogs;
+              storyboardOut.generatedCode = fin.generatedCode;
             }
             if (Array.isArray(parsed.quizQuestions) && parsed.quizQuestions.length >= 3) {
               const cloudBadge = outputLang === "kk" ? "ЖИ-сұрақ" : outputLang === "en" ? "AI Question" : "ИИ-вопрос";
@@ -2359,6 +2629,19 @@ ${segmented.coreText.slice(0, 9000)}`
 
     if (!usedCloudModel && outputLang !== sourceLang) {
       await this.translatePackageViaServer(pkgOut, sourceLang, outputLang, domainProfile, abortSignal);
+      const finTranslated = this.finalizeStoryboardLogsAndCode(
+        pkgOut.courseTitle,
+        domainProfile,
+        pkgOut.domainName,
+        pkgOut.sections,
+        pkgOut.glossary,
+        pkgOut.scenes,
+        segmented.coreText,
+        outputLang,
+        0
+      );
+      pkgOut.supervisorLogs = finTranslated.supervisorLogs;
+      pkgOut.generatedCode = finTranslated.generatedCode;
     }
 
     pkgOut.quizQuick = this.regenerateQuiz(

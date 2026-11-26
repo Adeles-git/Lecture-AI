@@ -177,7 +177,7 @@ window.LectureVisualDirector = (function () {
       domainId: "law_gov",
       name: "Editorial Ivory & Burgundy",
       label: "Право, государство и политология",
-      patternType: "editorial",
+      patternType: "archival_columns",
       glyph: "scales",
       bgTop: "#FAF8F5",
       bgBottom: "#F3EFE9",
@@ -309,79 +309,267 @@ window.LectureVisualDirector = (function () {
   function computeCalmDurationSec(caption, baseMin = 10, targetCps = 12.0, preRoll = 0.8, postRoll = 1.4) {
     const len = String(caption || "").trim().length;
     const speechSec = len / Math.max(9.5, targetCps);
-    return Math.min(22, Math.max(baseMin, +(preRoll + speechSec + postRoll).toFixed(1)));
+    const minForCps = len > 0 ? Math.ceil((len / 14.2) * 10) / 10 : baseMin;
+    return Math.min(28, Math.max(baseMin, minForCps, +(preRoll + speechSec + postRoll).toFixed(1)));
   }
 
-  // Подбор УНИКАЛЬНОГО набора визуальных композиций под предмет и структуру текста
-  function selectDomainModules(domainId, sceneCount = 6, contentHints = {}) {
-    const hasYears = Boolean(contentHints.hasYears);
-    const hasFormula = Boolean(contentHints.hasFormula);
+  const MODULE_FAMILIES = {
+    actor_network_web: "network",
+    system_anatomy: "network",
+    radial_constellation_map: "network",
+    social_stratification_pyramid: "hierarchy",
+    cs_layered_pipeline: "hierarchy",
+    shield_core_architecture: "hierarchy",
+    bio_pathway: "flow_steps",
+    pipeline_energy_flow: "flow_steps",
+    cause_effect_flow: "flow_steps",
+    chronicle_timeline: "timeline",
+    timeline_scroll: "timeline",
+    split_versus_duel: "contrast",
+    scales_balance_norm: "contrast",
+    multi_mode_chart: "analytics",
+    causal_curve: "analytics",
+    econ_funnel_waterfall: "analytics",
+    funnel_flow: "analytics",
+    case_dossier_blueprint: "case_practice",
+    worked_example: "case_practice",
+    eng_structural_forces: "case_practice",
+    bio_cell_cycle: "case_practice",
+    hero_problem_hook: "case_practice"
+  };
 
-    const map = {
-      soc_hum: [
-        "actor_network_web",
-        "social_stratification_pyramid",
-        "split_versus_duel",
-        hasYears ? "chronicle_timeline" : "multi_mode_chart",
-        "case_dossier_blueprint",
-        "radial_constellation_map"
-      ],
-      law_gov: [
-        "scales_balance_norm",
-        "social_stratification_pyramid",
-        "split_versus_duel",
-        "chronicle_timeline",
-        "case_dossier_blueprint",
-        "radial_constellation_map"
-      ],
-      bio_med: [
-        "bio_cell_cycle",
-        "bio_pathway",
-        "split_versus_duel",
-        "multi_mode_chart",
-        "case_dossier_blueprint",
-        "radial_constellation_map"
-      ],
-      biz_econ: [
-        "econ_funnel_waterfall",
-        "scales_balance_norm",
-        "split_versus_duel",
-        "multi_mode_chart",
-        "case_dossier_blueprint",
-        "radial_constellation_map"
-      ],
-      ai_cs: [
-        "cs_layered_pipeline",
-        "system_anatomy",
-        "split_versus_duel",
-        hasFormula ? "multi_mode_chart" : "actor_network_web",
-        "case_dossier_blueprint",
-        "radial_constellation_map"
-      ],
-      arch_eng: [
-        "eng_structural_forces",
-        "system_anatomy",
-        "split_versus_duel",
-        "multi_mode_chart",
-        "case_dossier_blueprint",
-        "radial_constellation_map"
-      ]
+  const DOMAIN_PATTERN_VARIANTS = {
+    arch_eng: ["blueprint", "dots", "editorial"],
+    ai_cs: ["dots", "blueprint", "editorial"],
+    bio_med: ["organic", "dots", "editorial"],
+    biz_econ: ["ledger", "dots", "editorial"],
+    soc_hum: ["editorial", "dots", "ledger"],
+    law_gov: ["archival_columns", "ledger", "editorial"]
+  };
+
+  function analyzeSectionSemantics(sec) {
+    const raw = [
+      sec?.title || "",
+      sec?.academicOriginal || "",
+      sec?.plainSummary || "",
+      ...(Array.isArray(sec?.plainBullets) ? sec.plainBullets : [])
+    ]
+      .join(" ")
+      .toLowerCase();
+
+    const count = (re) => (raw.match(re) || []).length;
+    const years = raw.match(/(?:^|\s)(?:1[5-9]\d{2}|20[0-3]\d)(?:\s*(?:г\.|год\S*|ж\.|жыл\S*))?|(?:\s|^)(?:[xхvi]{1,4}\s*в(?:ек|\.)|century|centuries|ғасыр)/gi) || [];
+    const metrics = raw.match(/\b\d+(?:[.,]\d+)?\s*(?:%|ms|sec|min|hz|kw|mpa|pts|points|tokens|times|мс|сек|мин|гц|квт|мпа|баллов|токенов|ұпай|токен|рет|₸|₽|\$|€|раз|:1)/gi) || [];
+    const hasFormula = /[=≈≠≥≤∑∫√]|cos\(|sin\(|log\(|O\(/i.test(raw);
+
+    const clamp01 = (v) => Math.max(0, Math.min(1, v));
+    return {
+      datesChronology: clamp01(years.length * 0.45 + count(/(?:^|[\s.,;:!?()«»"'])(?:эпох|истори|эволюц|период|поколен|хронолог|сначала|затем|впоследствии|кезең|тарих|дәуір|алдымен|кейін|timeline|history|era|century|evolution)/g) * 0.28),
+      numbersFormulas: clamp01((hasFormula ? 0.65 : 0) + metrics.length * 0.25 + count(/(?:^|[\s.,;:!?()«»"'])(?:график|кривая|рост|снижен|зависимост|пропорц|коэффициент|формул|метрик|диаграмм|көрсеткіш|өсім|төмендеу|формула|график|chart|curve|growth|ratio|metric)/g) * 0.22),
+      comparisonContrast: clamp01(count(/(?:^|[\s.,;:!?()«»"'])(?:в отличие от|напротив|однако|с одной стороны|с другой стороны|преимуществ|недостат|ошибк|наивн|традиционн|современн|без\s+|против|айырмашылы|артықшылы|кемшілі|қарама-қарсы|алайда|unlike|whereas|versus|however|advantage|disadvantage|contrast)/g) * 0.34),
+      stagesSequence: clamp01(((sec?.plainBullets?.length || 0) >= 3 ? 0.35 : 0) + count(/(?:^|[\s.,;:!?()«»"'])(?:этап|стади|шаг|фаз|алгоритм|последовательност|цикл|поток|пайплайн|далее|затем|қадам|кезең|саты|реттілік|ағын|stage|step|phase|pipeline|sequence|workflow)/g) * 0.26),
+      hierarchyTaxonomy: clamp01(count(/(?:^|[\s.,;:!?()«»"'])(?:уровен|уровн|ступен|иерарх|стратификац|классификац|категори|типолог|пирамид|слой|подсистем|архитектур|деңгей|саты|жіктеу|жүйе|құрылым|layer|level|hierarchy|tier|taxonomy)/g) * 0.32),
+      causeEffect: clamp01(count(/(?:^|[\s.,;:!?()«»"'])(?:потому что|поэтому|следовательно|приводит к|вызывает|влияет на|зависит от|вследствие|причина|следствие|механизм|эффект|фактор|себеп|салдар|сондықтан|өйткені|нәтиже|әсер|because|therefore|causes|leads to|effect|impact)/g) * 0.3),
+      balanceNormTradeoff: clamp01(count(/(?:^|[\s.,;:!?()«»"'])(?:баланс|равновес|компромисс|норма|правил|регулир|ограничен|санкц|право|обязанност|спрос|предложен|издержк|риск|тепе-теңдік|қағида|ереже|тәуекел|сұраныс|balance|equilibrium|tradeoff|norm|rule)/g) * 0.32),
+      practicalCase: clamp01(count(/(?:^|[\s.,;:!?()«»"'])(?:пример|кейс|задач|практик|применен|расчёт|расчет|сценари|ситуаци|дано|решен|на практике|в жизни|мысал|есеп|тәжірибе|жағдай|шешім|case|example|practice|problem|solution)/g) * 0.32),
+      actorsNetwork: clamp01(count(/(?:^|[\s.,;:!?()«»"'])(?:взаимодейств|участник|субъект|агент|актор|групп|институт|связ|сеть|экосистем|коммуникац|компонент|қоғам|байланыс|қатысушы|желі|орта|actor|participant|network|system|node)/g) * 0.3)
     };
+  }
 
-    const list = (map[domainId] || map.soc_hum).slice();
-    const count = Math.max(5, Math.min(6, sceneCount));
-    if (count === 5) {
-      return [list[0], list[1], list[2], list[4], list[5]];
+  function scoreModuleForSection(modId, f, domainId, idx, totalScenes) {
+    let sem = 0;
+    switch (modId) {
+      case "chronicle_timeline":
+      case "timeline_scroll":
+        sem = f.datesChronology * 52 + f.stagesSequence * 20;
+        break;
+      case "multi_mode_chart":
+        sem = f.numbersFormulas * 48 + f.causeEffect * 22;
+        break;
+      case "causal_curve":
+        sem = f.causeEffect * 38 + f.numbersFormulas * 34;
+        break;
+      case "worked_example":
+        sem = f.practicalCase * 44 + f.numbersFormulas * 30;
+        break;
+      case "case_dossier_blueprint":
+        sem = f.practicalCase * 46 + f.stagesSequence * 18;
+        break;
+      case "split_versus_duel":
+        sem = f.comparisonContrast * 54 + f.balanceNormTradeoff * 12;
+        break;
+      case "scales_balance_norm":
+        sem = f.balanceNormTradeoff * 48 + f.comparisonContrast * 20;
+        break;
+      case "social_stratification_pyramid":
+        sem = f.hierarchyTaxonomy * 52;
+        break;
+      case "cs_layered_pipeline":
+        sem = f.hierarchyTaxonomy * 34 + f.stagesSequence * 30;
+        break;
+      case "shield_core_architecture":
+        sem = f.hierarchyTaxonomy * 26 + f.balanceNormTradeoff * 26 + f.actorsNetwork * 18;
+        break;
+      case "cause_effect_flow":
+        sem = f.causeEffect * 50 + f.stagesSequence * 20;
+        break;
+      case "bio_pathway":
+      case "pipeline_energy_flow":
+        sem = f.stagesSequence * 46 + f.causeEffect * 20;
+        break;
+      case "econ_funnel_waterfall":
+      case "funnel_flow":
+        sem = f.numbersFormulas * 32 + f.stagesSequence * 32;
+        break;
+      case "actor_network_web":
+      case "system_anatomy":
+        sem = f.actorsNetwork * 46 + f.hierarchyTaxonomy * 16;
+        break;
+      case "eng_structural_forces":
+      case "bio_cell_cycle":
+      case "hero_problem_hook":
+        sem = f.causeEffect * 24 + f.actorsNetwork * 20 + 12;
+        break;
+      case "radial_constellation_map":
+        sem = idx === totalScenes - 1 ? 36 : 10;
+        break;
+      default:
+        sem = 10;
     }
-    return list.slice(0, count);
+
+    // Мягкий доменный бонус (не навязывает одинаковый шаблон, лишь усиливает профильные образы)
+    const domAff = {
+      arch_eng: { eng_structural_forces: 22, system_anatomy: 14, hero_problem_hook: 14, shield_core_architecture: 12, worked_example: 12, causal_curve: 10 },
+      ai_cs: { cs_layered_pipeline: 22, pipeline_energy_flow: 16, system_anatomy: 14, shield_core_architecture: 14, actor_network_web: 12, causal_curve: 10 },
+      bio_med: { bio_cell_cycle: 24, bio_pathway: 22, cause_effect_flow: 14, causal_curve: 12 },
+      biz_econ: { econ_funnel_waterfall: 22, funnel_flow: 16, scales_balance_norm: 16, worked_example: 14, multi_mode_chart: 12 },
+      soc_hum: { actor_network_web: 20, social_stratification_pyramid: 20, chronicle_timeline: 14, timeline_scroll: 12, split_versus_duel: 10 },
+      law_gov: { scales_balance_norm: 22, social_stratification_pyramid: 16, chronicle_timeline: 16, timeline_scroll: 14, shield_core_architecture: 12 }
+    };
+    const domBonus = domAff[domainId]?.[modId] || 0;
+
+    let posBonus = 0;
+    if (idx === 0) {
+      if (["hero_problem_hook", "actor_network_web", "eng_structural_forces", "cs_layered_pipeline", "bio_cell_cycle", "econ_funnel_waterfall", "scales_balance_norm"].includes(modId)) {
+        posBonus = 18;
+      }
+    } else if (idx === totalScenes - 1) {
+      if (modId === "radial_constellation_map") posBonus = 24;
+      else if (["case_dossier_blueprint", "worked_example"].includes(modId)) posBonus = 8;
+    }
+
+    return sem + domBonus + posBonus;
+  }
+
+  function hashSeedInt(str) {
+    let h = 2166136261;
+    const s = String(str || "");
+    for (let i = 0; i < s.length; i++) {
+      h ^= s.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    return h >>> 0;
+  }
+
+  // Семантический подбор УНИКАЛЬНОЙ последовательности композиций, раскладок и переходов под конкретные разделы лекции
+  function selectSectionModules(domainId, sections = [], globalSignals = {}, options = {}) {
+    const count = Math.max(4, Math.min(6, options.sceneCount || Math.max(5, Math.min(6, sections.length || 6))));
+    const seedInt = hashSeedInt(`${domainId}||${sections.map((s) => s?.title || "").join("|")}||${options.seedStr || ""}`);
+
+    const allPool = Object.keys(MODULE_FAMILIES);
+    const usedModules = new Set();
+    let prevFamily = "";
+    let prevLayout = "";
+    let prevTransition = "";
+
+    const wideFriendly = new Set(["chronicle_timeline", "timeline_scroll", "cs_layered_pipeline", "pipeline_energy_flow", "multi_mode_chart", "causal_curve", "econ_funnel_waterfall", "funnel_flow", "cause_effect_flow", "worked_example"]);
+    const focusSplitFriendly = new Set(["split_versus_duel", "scales_balance_norm", "case_dossier_blueprint", "worked_example", "shield_core_architecture"]);
+    const transitions = ["cross_dissolve", "slide", "zoom_fade", "wipe"];
+    const accentModes = ["primary", "secondary", "contrast", "neutral_ink"];
+    const pVariants = DOMAIN_PATTERN_VARIANTS[domainId] || DOMAIN_PATTERN_VARIANTS.soc_hum;
+
+    const chosen = [];
+    for (let idx = 0; idx < count; idx++) {
+      const sec = sections[idx % Math.max(1, sections.length)] || { title: "", academicOriginal: "", plainSummary: "", plainBullets: [] };
+      const feats = analyzeSectionSemantics(sec);
+
+      const ranked = allPool
+        .filter((modId) => !usedModules.has(modId))
+        .map((modId) => {
+          const fam = MODULE_FAMILIES[modId];
+          let sc = scoreModuleForSection(modId, feats, domainId, idx, count);
+          if (fam === prevFamily) sc -= 85;
+          // Детерминированный микро-сдвиг от содержания лекции, чтобы даже похожие темы имели разный визуальный ритм
+          const jitter = ((seedInt + idx * 97 + modId.length * 31) % 11) * 0.9;
+          return { modId, fam, sc: sc + jitter };
+        })
+        .sort((a, b) => b.sc - a.sc);
+
+      const best = ranked[0] || { modId: "actor_network_web", fam: "network" };
+      usedModules.add(best.modId);
+      prevFamily = best.fam;
+
+      // Авто-режиссура раскладки кадра (зависит от архетипа, индекса и seed лекции)
+      let layoutMode = "split_tutor";
+      if (idx === 0) {
+        layoutMode = seedInt % 2 === 0 ? "hero_intro" : "split_tutor";
+      } else if (wideFriendly.has(best.modId) && prevLayout !== "wide_stage") {
+        layoutMode = "wide_stage";
+      } else if (focusSplitFriendly.has(best.modId) && prevLayout !== "focus_split") {
+        layoutMode = "focus_split";
+      } else if (prevLayout === "split_tutor") {
+        layoutMode = wideFriendly.has(best.modId) ? "wide_stage" : "focus_split";
+      }
+      prevLayout = layoutMode;
+
+      // Разнообразие переходов между сценами
+      let transitionType = transitions[(idx * 3 + seedInt) % transitions.length];
+      if (idx === 0 && seedInt % 2 === 0) transitionType = "zoom_fade";
+      else if ((best.fam === "timeline" || best.fam === "flow_steps") && (idx + seedInt) % 2 === 0) transitionType = "wipe";
+      else if (best.fam === "contrast" && (idx + seedInt) % 2 === 0) transitionType = "slide";
+      if (transitionType === prevTransition) {
+        transitionType = transitions[(transitions.indexOf(transitionType) + 1) % transitions.length];
+      }
+      prevTransition = transitionType;
+
+      chosen.push({
+        moduleId: best.modId,
+        family: best.fam,
+        layoutMode,
+        transitionType,
+        styleVariant: {
+          patternVariant: pVariants[(idx + seedInt) % pVariants.length],
+          accentMode: accentModes[(idx * 3 + (seedInt >>> 2)) % accentModes.length],
+          frameless: layoutMode === "wide_stage" || (idx + seedInt) % 3 === 0,
+          paletteOffset: (idx * 2 + (seedInt >>> 4)) % 4
+        }
+      });
+    }
+
+    return chosen;
+  }
+
+  // Обратная совместимость со старым вызовом
+  function selectDomainModules(domainId, sceneCount = 6, contentHints = {}) {
+    if (Array.isArray(contentHints.sections) && contentHints.sections.length > 0) {
+      return selectSectionModules(domainId, contentHints.sections, contentHints, { sceneCount }).map((c) => c.moduleId);
+    }
+    const stubSections = Array.from({ length: sceneCount }, (_, i) => ({
+      title: `Раздел ${i + 1}`,
+      academicOriginal: contentHints.hasFormula ? "формула = результат 50%" : contentHints.hasYears ? "1990 2020 эволюция этап" : "анализ пример сравнение структура"
+    }));
+    return selectSectionModules(domainId, stubSections, contentHints, { sceneCount }).map((c) => c.moduleId);
   }
 
   return {
     EDITORIAL_THEMES,
+    MODULE_FAMILIES,
     getTheme,
     detectVisualDomain,
     estimateComplexityAndPacing,
     computeCalmDurationSec,
+    analyzeSectionSemantics,
+    selectSectionModules,
     selectDomainModules
   };
 })();
