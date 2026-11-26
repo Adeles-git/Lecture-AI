@@ -1,0 +1,21 @@
+# macOS & OS artifacts
+.DS_Store
+Thumbs.db
+
+# Python cache & virtual environments
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+
+# Local SQLite database (auto-created & seeded by server.py on first run)
+data/*.db
+data/*.db-journal
+data/*.db-wal
+data/*.db-shm
+
+# Environment / secrets
+.env
+.env.local
