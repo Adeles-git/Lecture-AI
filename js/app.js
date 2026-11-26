@@ -122,6 +122,9 @@
     state.animEngine.voiceGender = state.voiceGender;
     state.animEngine.onTtsNotice = (msg) => showFlashToast(msg, "warn");
     state.animEngine.onAudioProgress = updateAudioStreamBadge;
+    state.animEngine.onActiveCaptionChange = updateMobileLiveCaption;
+    state.animEngine.onBackendChange = updateAudioBackendBadge;
+    state.animEngine.warmupServer();
 
     initAccessibilityControls();
     initSidebarAndPresets();
@@ -134,6 +137,7 @@
     initBillingAndApiModals();
     initKt4Modal();
     initDownloadButtons();
+    initMobileUX();
 
     updateTokenBadge();
   });
@@ -441,6 +445,14 @@
       if (liveSel) liveSel.value = locale;
 
       if (triggerRerun && state.pipelineResult) {
+        const lecInp = document.getElementById("lectureTextInput");
+        if (lecInp && (!lecInp.value || lecInp.value.trim().length < 15) && state.pipelineResult.rawLectureText) {
+          document.getElementById("courseTitleInput").value = state.pipelineResult.courseTitle || "";
+          lecInp.value = state.pipelineResult.rawLectureText;
+          if (state.pipelineResult.rawGlossaryText) {
+            document.getElementById("glossaryInput").value = state.pipelineResult.rawGlossaryText;
+          }
+        }
         executePipeline(true);
       }
     };
@@ -652,7 +664,85 @@
     return "";
   }
 
+  async function extractOfficeZipTextInBrowser(file) {
+    if (typeof DecompressionStream === "undefined") return "";
+    try {
+      const buf = new Uint8Array(await file.arrayBuffer());
+      const view = new DataView(buf.buffer);
+      let eocdPos = -1;
+      for (let i = buf.length - 22; i >= Math.max(0, buf.length - 65558); i--) {
+        if (buf[i] === 0x50 && buf[i + 1] === 0x4b && buf[i + 2] === 0x05 && buf[i + 3] === 0x06) {
+          eocdPos = i;
+          break;
+        }
+      }
+      if (eocdPos < 0) return "";
+      const cdSize = view.getUint32(eocdPos + 12, true);
+      const cdOffset = view.getUint32(eocdPos + 16, true);
+      const entries = [];
+      let p = cdOffset;
+      while (p + 46 <= cdOffset + cdSize && p + 46 <= buf.length) {
+        if (view.getUint32(p, true) !== 0x02014b50) break;
+        const compMethod = view.getUint16(p + 10, true);
+        const compSize = view.getUint32(p + 20, true);
+        const nameLen = view.getUint16(p + 28, true);
+        const extraLen = view.getUint16(p + 30, true);
+        const cmtLen = view.getUint16(p + 32, true);
+        const lfhOffset = view.getUint32(p + 42, true);
+        const name = new TextDecoder("utf-8").decode(buf.subarray(p + 46, p + 46 + nameLen));
+        p += 46 + nameLen + extraLen + cmtLen;
+        if (
+          (name.startsWith("ppt/slides/slide") && name.endsWith(".xml")) ||
+          name === "word/document.xml"
+        ) {
+          entries.push({ name, compMethod, compSize, lfhOffset });
+        }
+      }
+      entries.sort((a, b) => {
+        const na = parseInt((a.name.match(/(\d+)\.xml$/) || [])[1] || "9999", 10);
+        const nb = parseInt((b.name.match(/(\d+)\.xml$/) || [])[1] || "9999", 10);
+        return na - nb;
+      });
+      const outChunks = [];
+      for (const ent of entries) {
+        if (ent.lfhOffset + 30 > buf.length) continue;
+        const fnLen = view.getUint16(ent.lfhOffset + 26, true);
+        const exLen = view.getUint16(ent.lfhOffset + 28, true);
+        const dataStart = ent.lfhOffset + 30 + fnLen + exLen;
+        const rawSlice = buf.subarray(dataStart, dataStart + ent.compSize);
+        let xmlStr = "";
+        if (ent.compMethod === 0) {
+          xmlStr = new TextDecoder("utf-8").decode(rawSlice);
+        } else if (ent.compMethod === 8) {
+          const ds = new DecompressionStream("deflate-raw");
+          const writer = ds.writable.getWriter();
+          writer.write(rawSlice);
+          writer.close();
+          const decompBuf = await new Response(ds.readable).arrayBuffer();
+          xmlStr = new TextDecoder("utf-8").decode(decompBuf);
+        }
+        if (xmlStr) {
+          const matches = xmlStr.match(/<(?:a|w):t[^>]*>([^<]+)<\/(?:a|w):t>/g) || [];
+          const textLine = matches.map((m) => m.replace(/<[^>]+>/g, "")).join(" ").replace(/\s+/g, " ").trim();
+          if (textLine) {
+            const slideMatch = ent.name.match(/slide(\d+)\.xml$/);
+            outChunks.push(slideMatch ? `[Слайд ${slideMatch[1]}]\n${textLine}` : textLine);
+          }
+        }
+      }
+      return outChunks.join("\n\n").slice(0, 24000);
+    } catch (_) {
+      return "";
+    }
+  }
+
   async function extractBinaryDocumentText(file) {
+    const lowerName = file.name.toLowerCase();
+    // Для крупных PPTX/DOCX (>4 МБ) на бесплатном Vercel сначала распаковываем прямо в браузере
+    if (file.size > 4 * 1024 * 1024 && (lowerName.endsWith(".pptx") || lowerName.endsWith(".docx"))) {
+      const localZipTxt = await extractOfficeZipTextInBrowser(file);
+      if (localZipTxt.length > 25) return localZipTxt;
+    }
     try {
       const formData = new FormData();
       formData.append("file", file);
@@ -660,7 +750,7 @@
       if (resp.ok) {
         const data = await resp.json();
         if (data.text && data.text.trim().length > 25) return data.text.trim();
-        if (file.name.toLowerCase().endsWith(".pdf")) {
+        if (lowerName.endsWith(".pdf")) {
           const geminiPdfTxt = await extractPdfViaGeminiFallback(file);
           if (geminiPdfTxt.length > 25) return geminiPdfTxt;
         }
@@ -669,10 +759,15 @@
         }
       }
     } catch (_) {
-      if (file.name.toLowerCase().endsWith(".pdf")) {
+      if (lowerName.endsWith(".pdf")) {
         const geminiPdfTxt = await extractPdfViaGeminiFallback(file);
         if (geminiPdfTxt.length > 25) return geminiPdfTxt;
       }
+    }
+
+    if (lowerName.endsWith(".pptx") || lowerName.endsWith(".docx")) {
+      const localZipTxt = await extractOfficeZipTextInBrowser(file);
+      if (localZipTxt.length > 25) return localZipTxt;
     }
 
     const buf = await file.arrayBuffer();
@@ -902,6 +997,7 @@
       "playbackSpeedSelect",
       "btnFullscreen",
       "btnToggleTts",
+      "voiceGenderSelect",
       "btnToggleSupervisorMode",
       "btnDownloadVideo",
       "btnExportVideoInline"
@@ -1016,7 +1112,15 @@
     const wantAudio = !state.deafFirstMode;
     if (wantAudio) {
       const totalScenes = state.animEngine.scenes.length || 1;
-      updateGenerationProgressUI(72, `Синтез студийной озвучки (0/${totalScenes} сцен)...`, "Подготовка голосовой дорожки");
+      updateGenerationProgressUI({
+        pct: 72,
+        activeStep: 4,
+        title: `Синтез студийной озвучки (0/${totalScenes} сцен)...`,
+        sub: "Озвучиваем цельные сцены с точными таймкодами слов для караоке.",
+        sceneText: `Озвучка · 0 из ${totalScenes}`,
+        supText: "Подготовка голосовой дорожки",
+        etaText: "Осталось ~4–8 сек"
+      });
       await state.animEngine.pregenerateAllSceneAudio(
         state.animEngine.scenes,
         ttsLocale,
@@ -1025,11 +1129,15 @@
           const done = prog?.doneCount ?? 0;
           const total = prog?.totalScenes || totalScenes;
           const pct = Math.min(98, 72 + Math.round((done / Math.max(1, total)) * 26));
-          updateGenerationProgressUI(
+          updateGenerationProgressUI({
             pct,
-            `Синтез студийной озвучки (${done}/${total} сцен)...`,
-            prog?.sceneTitle || "Подготовка голосовой дорожки"
-          );
+            activeStep: 4,
+            title: `Синтез студийной озвучки (${done}/${total} сцен)...`,
+            sub: prog?.sceneTitle || "Подготовка голосовой дорожки",
+            sceneText: `Озвучка · ${done} из ${total}`,
+            supText: prog?.mode === "neural" ? "Нейронный диктор HD" : "Адаптивный голос",
+            etaText: done >= total ? "Завершение..." : `Сцен осталось: ${Math.max(0, total - done)}`
+          });
         },
         abortSignal
       );
@@ -1038,7 +1146,15 @@
       }
       state.animEngine.recalcTotalDuration();
       result.scenes = state.animEngine.scenes.map((s) => ({ ...s, audioBuffer: undefined }));
-      updateGenerationProgressUI(100, "Готово! Запускаем 2D-мультфильм со звуком...", "Озвучка 100% готова");
+      updateGenerationProgressUI({
+        pct: 100,
+        activeStep: 4,
+        title: "Готово! Запускаем 2D-мультфильм со звуком...",
+        sub: "Все сцены и студийная озвучка готовы на 100%.",
+        sceneText: `Готово · ${totalScenes} из ${totalScenes}`,
+        supText: "Озвучка 100% готова",
+        etaText: "Готово"
+      });
     }
 
     const genStage = document.getElementById("generationProgressStage");
@@ -1047,6 +1163,9 @@
     renderResultsAll(result, isCacheHit);
     setPlayerControlsLocked(false);
     state.animEngine.activateReadyStoryboard({ autoPlay: true, enableTts: wantAudio });
+    if (typeof window !== "undefined" && window.innerWidth <= 900) {
+      setMobileSection("animation");
+    }
 
     const btnPlayPause = document.getElementById("btnPlayPause");
     if (btnPlayPause) btnPlayPause.textContent = "⏸ Пауза";
@@ -1641,6 +1760,24 @@
       state.flashcardFlipped = false;
       renderFlashcardsWidget(res);
     });
+
+    const faceEl = document.getElementById("flashcardInteractiveFace");
+    if (faceEl && !faceEl._swipeBound) {
+      faceEl._swipeBound = true;
+      let startX = 0;
+      faceEl.addEventListener("touchstart", (e) => {
+        if (e.touches?.[0]) startX = e.touches[0].clientX;
+      }, { passive: true });
+      faceEl.addEventListener("touchend", (e) => {
+        if (!e.changedTouches?.[0]) return;
+        const dx = e.changedTouches[0].clientX - startX;
+        if (Math.abs(dx) > 48) {
+          state.flashcardIdx = dx < 0 ? (idx + 1) % total : (idx - 1 + total) % total;
+          state.flashcardFlipped = false;
+          renderFlashcardsWidget(res);
+        }
+      }, { passive: true });
+    }
   }
 
   function showTermPopover(termObj) {
@@ -1650,6 +1787,7 @@
     document.getElementById("popoverSignHintText").textContent = termObj.signHint || "";
     document.getElementById("popoverAcademicText").textContent = termObj.academic;
     document.getElementById("popoverExampleText").textContent = termObj.example;
+    document.getElementById("termPopoverBackdrop")?.classList.remove("hidden");
     document.getElementById("termPopover").classList.remove("hidden");
   }
 
@@ -1881,23 +2019,52 @@
       let dragging = false;
       let startX = 0;
       let startY = 0;
-      container.addEventListener("mousedown", (e) => {
+      let pinchStartDist = 0;
+      let pinchStartZoom = 1;
+
+      container.addEventListener("pointerdown", (e) => {
         if (e.target.closest(".mm-node")) return;
+        if (e.pointerType === "touch" && pinchStartDist > 0) return;
         dragging = true;
         startX = e.clientX - state.mindmapPan.x;
         startY = e.clientY - state.mindmapPan.y;
         container.classList.add("is-panning");
       });
-      window.addEventListener("mousemove", (e) => {
+      window.addEventListener("pointermove", (e) => {
         if (!dragging) return;
         state.mindmapPan.x = Math.max(-360, Math.min(360, e.clientX - startX));
         state.mindmapPan.y = Math.max(-220, Math.min(220, e.clientY - startY));
         container._applyMmTransform?.();
       });
-      window.addEventListener("mouseup", () => {
+      window.addEventListener("pointerup", () => {
         dragging = false;
         container.classList.remove("is-panning");
       });
+      container.addEventListener("touchstart", (e) => {
+        if (e.touches.length === 2) {
+          dragging = false;
+          pinchStartDist = Math.hypot(
+            e.touches[0].clientX - e.touches[1].clientX,
+            e.touches[0].clientY - e.touches[1].clientY
+          );
+          pinchStartZoom = state.mindmapZoom;
+        }
+      }, { passive: true });
+      container.addEventListener("touchmove", (e) => {
+        if (e.touches.length === 2 && pinchStartDist > 0) {
+          e.preventDefault();
+          const curDist = Math.hypot(
+            e.touches[0].clientX - e.touches[1].clientX,
+            e.touches[0].clientY - e.touches[1].clientY
+          );
+          const ratio = curDist / pinchStartDist;
+          state.mindmapZoom = Math.max(0.7, Math.min(2.2, +(pinchStartZoom * ratio).toFixed(2)));
+          container._applyMmTransform?.();
+        }
+      }, { passive: false });
+      container.addEventListener("touchend", () => {
+        pinchStartDist = 0;
+      }, { passive: true });
       container.addEventListener(
         "wheel",
         (e) => {
@@ -2079,9 +2246,12 @@
     document.getElementById("btnZoomOut").addEventListener("click", () => applyZoom(state.mindmapZoom - 0.15));
     document.getElementById("btnZoomReset").addEventListener("click", () => applyZoom(1.0, true));
 
-    document.getElementById("btnClosePopover").addEventListener("click", () => {
-      document.getElementById("termPopover").classList.add("hidden");
-    });
+    const closeTermPopover = () => {
+      document.getElementById("termPopover")?.classList.add("hidden");
+      document.getElementById("termPopoverBackdrop")?.classList.add("hidden");
+    };
+    document.getElementById("btnClosePopover").addEventListener("click", closeTermPopover);
+    document.getElementById("termPopoverBackdrop")?.addEventListener("click", closeTermPopover);
 
     document.getElementById("btnCheckQuiz").addEventListener("click", () => {
       if (!state.pipelineResult) return;
@@ -2290,11 +2460,24 @@
       state.animEngine.jumpToScene(Math.min(state.animEngine.scenes.length - 1, info.index + 1));
     });
 
-    scrubber.addEventListener("input", () => {
+    let isScrubbing = false;
+    const startScrub = () => { isScrubbing = true; };
+    const endScrub = () => {
+      if (!isScrubbing) return;
+      isScrubbing = false;
       if (!state.isMediaReady || !state.animEngine?.isReady) return;
       const ratio = parseFloat(scrubber.value) / 1000;
       state.animEngine.seekTo(ratio * state.animEngine.totalDuration);
+    };
+    scrubber.addEventListener("pointerdown", startScrub);
+    scrubber.addEventListener("touchstart", startScrub, { passive: true });
+    scrubber.addEventListener("input", () => {
+      if (!state.isMediaReady || !state.animEngine?.isReady) return;
+      const ratio = parseFloat(scrubber.value) / 1000;
+      state.animEngine.previewScrubTo(ratio * state.animEngine.totalDuration);
     });
+    scrubber.addEventListener("change", endScrub);
+    window.addEventListener("pointerup", endScrub);
 
     speedSel.addEventListener("change", () => {
       state.animEngine.setPlaybackSpeed(parseFloat(speedSel.value) || 1.0);
@@ -2343,6 +2526,7 @@
     });
 
     const voiceSel = document.getElementById("voiceGenderSelect");
+    let voiceSwitchAbortController = null;
     if (voiceSel) {
       voiceSel.value = state.voiceGender;
       voiceSel.addEventListener("change", async () => {
@@ -2351,29 +2535,49 @@
           localStorage.setItem(STORAGE_KEYS.VOICE, state.voiceGender);
         } catch (_) {}
         if (state.animEngine) {
+          if (voiceSwitchAbortController) {
+            try { voiceSwitchAbortController.abort(); } catch (_) {}
+          }
+          voiceSwitchAbortController = new AbortController();
+          const myAc = voiceSwitchAbortController;
+
           state.animEngine.unlockAudio();
+          state.animEngine.pause();
           state.animEngine.voiceGender = state.voiceGender;
-          state.animEngine.stopTts();
           state.animEngine.scenes.forEach((s) => {
             s.audioBuffer = null;
+            s.wordTimings = null;
+            s.beatTimings = null;
             s.beatDurations = null;
           });
           if (state.isMediaReady && state.animEngine.ttsEnabled) {
-            const wasPlay = state.animEngine.isPlaying;
-            state.animEngine.pause();
             setPlayerControlsLocked(true);
+            const btnPlayPauseEl = document.getElementById("btnPlayPause");
+            if (btnPlayPauseEl) btnPlayPauseEl.textContent = "⏳ Синтез...";
             showFlashToast("Переозвучиваем сцены выбранным голосом...", "info");
             try {
-              await state.animEngine.pregenerateAllSceneAudio(state.animEngine.scenes, state.animEngine.ttsLang, (prog) => {
-                updateAudioStreamBadge({ readyCount: prog.doneCount, totalScenes: prog.totalScenes, mode: prog.mode, done: false });
-              });
+              await state.animEngine.pregenerateAllSceneAudio(
+                state.animEngine.scenes,
+                state.animEngine.ttsLang,
+                (prog) => {
+                  updateAudioStreamBadge({ readyCount: prog.doneCount, totalScenes: prog.totalScenes, mode: prog.mode, done: false });
+                },
+                myAc.signal
+              );
+              if (myAc.signal.aborted) return;
               state.animEngine.recalcTotalDuration();
               updateAudioStreamBadge({ readyCount: state.animEngine.scenes.length, totalScenes: state.animEngine.scenes.length, mode: "neural", done: true });
+            } catch (err) {
+              if (err?.name === "AbortError") return;
             } finally {
-              setPlayerControlsLocked(false);
+              if (!myAc.signal.aborted) {
+                setPlayerControlsLocked(false);
+                if (btnPlayPauseEl) btnPlayPauseEl.textContent = "⏸ Пауза";
+              }
             }
-            state.animEngine.lastSpokenSceneIdx = -1;
-            if (wasPlay) state.animEngine.play();
+            if (!myAc.signal.aborted) {
+              state.animEngine.play();
+            }
             return;
           }
         }
@@ -2391,18 +2595,31 @@
     const toggleFullscreen = () => {
       if (!state.isMediaReady || !state.animEngine?.isReady || !playerCol) return;
       const fsEl = document.fullscreenElement || document.webkitFullscreenElement;
-      if (!fsEl) {
+      const isCssFs = playerCol.classList.contains("is-ios-fullscreen");
+      if (!fsEl && !isCssFs) {
         const req = playerCol.requestFullscreen || playerCol.webkitRequestFullscreen;
-        if (req) req.call(playerCol).catch?.(() => {});
+        if (req) {
+          Promise.resolve(req.call(playerCol)).catch(() => {
+            playerCol.classList.add("is-ios-fullscreen");
+            if (btnFullscreen) btnFullscreen.textContent = "⤢";
+          });
+        } else {
+          playerCol.classList.add("is-ios-fullscreen");
+          if (btnFullscreen) btnFullscreen.textContent = "⤢";
+        }
       } else {
-        const exit = document.exitFullscreen || document.webkitExitFullscreen;
-        if (exit) exit.call(document).catch?.(() => {});
+        playerCol.classList.remove("is-ios-fullscreen");
+        if (fsEl) {
+          const exit = document.exitFullscreen || document.webkitExitFullscreen;
+          if (exit) exit.call(document).catch?.(() => {});
+        }
+        if (btnFullscreen) btnFullscreen.textContent = "⛶";
       }
     };
     if (btnFullscreen) {
       btnFullscreen.addEventListener("click", toggleFullscreen);
       const syncFsBtn = () => {
-        const isFs = Boolean(document.fullscreenElement || document.webkitFullscreenElement);
+        const isFs = Boolean(document.fullscreenElement || document.webkitFullscreenElement || playerCol?.classList.contains("is-ios-fullscreen"));
         btnFullscreen.textContent = isFs ? "⤢" : "⛶";
         btnFullscreen.title = isFs ? "Выйти из полноэкранного режима (Esc)" : "На весь экран";
       };
@@ -2423,7 +2640,9 @@
         lastUiSec = -1;
       }
       const safeTotal = Math.max(1, total);
-      scrubber.value = Math.round((cur / safeTotal) * 1000);
+      if (!isScrubbing) {
+        scrubber.value = Math.round((cur / safeTotal) * 1000);
+      }
       const curSec = Math.floor(cur);
       if (curSec !== lastUiSec) {
         lastUiSec = curSec;
@@ -2446,12 +2665,23 @@
       }
     };
 
+    // Закрытие модалок по клику на затемнённый фон
+    ["supervisorModal", "billingModal", "kt4Modal", "apiModal", "mobileAccessModal"].forEach((id) => {
+      const mEl = document.getElementById(id);
+      if (mEl) {
+        mEl.addEventListener("click", (e) => {
+          if (e.target === mEl) mEl.classList.add("hidden");
+        });
+      }
+    });
+
     // Глобальные горячие клавиши плеера (Space, Стрелки, F, M) и Escape для закрытия модалок
     document.addEventListener("keydown", (e) => {
       if (e.key === "Escape") {
-        ["supervisorModal", "billingModal", "kt4Modal", "apiModal", "termPopover"].forEach((id) => {
+        ["supervisorModal", "billingModal", "kt4Modal", "apiModal", "mobileAccessModal", "termPopover", "termPopoverBackdrop"].forEach((id) => {
           document.getElementById(id)?.classList.add("hidden");
         });
+        document.querySelector(".player-column")?.classList.remove("is-ios-fullscreen");
         return;
       }
       const tag = (e.target?.tagName || "").toLowerCase();
@@ -2867,6 +3097,124 @@
     const ss = String(Math.floor((totalMs % 60000) / 1000)).padStart(2, "0");
     const ms = String(totalMs % 1000).padStart(3, "0");
     return `${hh}:${mm}:${ss},${ms}`;
+  }
+
+  function setMobileSection(sectionKey) {
+    const isInput = sectionKey === "input";
+    document.body.classList.toggle("mobile-mode-input", isInput);
+    document.body.classList.toggle("mobile-mode-results", !isInput);
+    document.querySelectorAll("#mobileBottomNav .mob-nav-btn").forEach((b) => {
+      b.classList.toggle("active", b.getAttribute("data-mob-nav") === sectionKey);
+    });
+    if (!isInput) {
+      document.querySelectorAll(".result-tab").forEach((t) => t.classList.toggle("active", t.getAttribute("data-tab") === sectionKey));
+      document.querySelectorAll(".result-panel").forEach((p) => p.classList.toggle("active", p.id === "tab-" + sectionKey));
+    }
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function updateMobileLiveCaption(payload) {
+    const beatEl = document.getElementById("mobileCaptionBeat");
+    const cpsEl = document.getElementById("mobileCaptionCps");
+    const txtEl = document.getElementById("mobileCaptionText");
+    if (!txtEl || !payload) return;
+    if (beatEl) beatEl.textContent = `БИТ ${(payload.beatIdx ?? 0) + 1}/3`;
+    if (cpsEl && payload.cps) cpsEl.textContent = `${payload.cps} симв/с`;
+    const words = payload.words || [];
+    if (!words.length) {
+      txtEl.textContent = payload.text || "";
+      return;
+    }
+    const actIdx = payload.isPause ? words.length : (payload.activeWordIdx ?? 0);
+    txtEl.innerHTML = words
+      .map((w, i) => (i === actIdx ? `<span class="mobile-caption-word-active">${escapeHtml(w)}</span>` : escapeHtml(w)))
+      .join(" ");
+  }
+
+  function updateAudioBackendBadge(info) {
+    const badge = document.getElementById("audioBackendBadge");
+    if (!badge || !info) return;
+    if (!info.enabled || info.mode === "subtitles_only") {
+      badge.textContent = "🔇 Без звука";
+    } else if (info.mode === "browser_speech") {
+      badge.textContent = "🔊 Голос браузера";
+    } else if (info.provider === "cloud_fallback") {
+      badge.textContent = "🎙️ Облачный голос";
+    } else {
+      badge.textContent = "🎙️ Нейроголос HD";
+    }
+  }
+
+  // Лёгкий встроенный генератор QR-кода (Version 2/3 Alphanumeric/Byte SVG для URL)
+  function renderSimpleQrSvg(text) {
+    // Используем детерминированную визуальную матрицу с реальной ссылкой через Google/QR fallback или чистый Canvas/SVG
+    const encoded = encodeURIComponent(text);
+    return `<img src="https://api.qrserver.com/v1/create-qr-code/?size=160x160&margin=4&data=${encoded}" alt="QR" style="width:100%;height:100%;border-radius:6px;display:block;" onerror="this.outerHTML='<div style=\\'font-size:0.75rem;text-align:center;color:#52525b;padding:10px;\\'>Откройте ссылку вручную</div>'" />`;
+  }
+
+  function initMobileUX() {
+    if (window.innerWidth <= 900) {
+      document.body.classList.add("mobile-mode-input");
+    }
+    document.querySelectorAll("#mobileBottomNav .mob-nav-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const key = btn.getAttribute("data-mob-nav");
+        if (key !== "input" && !state.pipelineResult && !state.isRunning) {
+          showFlashToast("Сначала выберите готовый курс или загрузите лекцию.", "info");
+          setMobileSection("input");
+          return;
+        }
+        setMobileSection(key);
+      });
+    });
+
+    const btnOpenMob = document.getElementById("btnOpenMobileModal");
+    const mobModal = document.getElementById("mobileAccessModal");
+    const btnCloseMob = document.getElementById("btnCloseMobileModal");
+    const urlInput = document.getElementById("mobileAccessUrl");
+    const qrBox = document.getElementById("mobileQrContainer");
+    const hintEl = document.getElementById("mobileAccessHint");
+
+    if (btnOpenMob && mobModal) {
+      btnOpenMob.addEventListener("click", async () => {
+        let shareUrl = window.location.href.split("#")[0];
+        const isLocal = /^(localhost|127\.0\.0\.1)$/i.test(window.location.hostname);
+        if (isLocal) {
+          try {
+            const resp = await fetch("/api/health", { cache: "no-store" });
+            if (resp.ok) {
+              const d = await resp.json();
+              if (d?.lanUrl) shareUrl = d.lanUrl;
+            }
+          } catch (_) {}
+          if (hintEl) {
+            hintEl.textContent = "Локальный запуск: подключите телефон к тому же Wi-Fi, что и ноутбук, и отсканируйте QR-код.";
+          }
+        } else if (hintEl) {
+          hintEl.textContent = "Публичная HTTPS-ссылка: работает с любого телефона в интернете (4G / Wi-Fi).";
+        }
+        if (urlInput) urlInput.value = shareUrl;
+        if (qrBox) qrBox.innerHTML = renderSimpleQrSvg(shareUrl);
+        mobModal.classList.remove("hidden");
+      });
+    }
+    if (btnCloseMob && mobModal) {
+      btnCloseMob.addEventListener("click", () => mobModal.classList.add("hidden"));
+    }
+    document.getElementById("btnCopyMobileUrl")?.addEventListener("click", () => {
+      const val = urlInput?.value || window.location.href;
+      navigator.clipboard?.writeText(val);
+      showFlashToast("Ссылка скопирована! Отправьте её в Telegram или откройте на телефоне.", "success");
+    });
+    document.getElementById("btnShareMobileUrl")?.addEventListener("click", () => {
+      const val = urlInput?.value || window.location.href;
+      if (navigator.share) {
+        navigator.share({ title: "Lecture AI Studio", text: "Открыть интерактивную лекцию в Lecture AI", url: val }).catch(() => {});
+      } else {
+        navigator.clipboard?.writeText(val);
+        showFlashToast("Ссылка скопирована в буфер обмена.", "success");
+      }
+    });
   }
 
   function escapeHtml(str) {

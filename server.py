@@ -27,10 +27,17 @@ import subprocess
 import tempfile
 import posixpath
 import ssl
+import base64
+import socket
 from collections import OrderedDict
-from urllib.parse import urlparse, unquote, urlencode
+from urllib.parse import urlparse, unquote, urlencode, quote
 from urllib.request import Request, urlopen
 from xml.etree import ElementTree as ET
+
+try:
+    import aiohttp
+except ImportError:
+    aiohttp = None
 
 try:
     import certifi
@@ -48,8 +55,11 @@ except ImportError:
 TTS_CACHE_LOCK = threading.Lock()
 TTS_CACHE = OrderedDict()
 TTS_CACHE_MAX = 256
+TTS_DISK_MAX = 400
 TTS_INFLIGHT = {}
-TTS_SEMAPHORE = threading.Semaphore(3)
+TTS_SEMAPHORE = threading.Semaphore(2)
+TTS_CIRCUIT_OPEN_UNTIL = 0.0
+TTS_CONSECUTIVE_FAILS = 0
 
 TRANSLATE_CACHE_LOCK = threading.Lock()
 TRANSLATE_CACHE = OrderedDict()
@@ -194,30 +204,52 @@ def clean_tts_text(raw_text, lang="ru"):
     text = str(raw_text or "")
     l = str(lang or "ru").lower()
     text = re.sub(r"[\u200b-\u200f\ufeff]", "", text)
-    # Сохраняем интонационные паузы вместо «слепого» удаления кавычек и тире
-    text = text.replace("[", " ").replace("]", " ").replace('"', " ")
-    text = text.replace("«", ", ").replace("»", ", ")
+
+    # Убираем иноязычные дубли в скобках, чтобы диктор не ломал дикцию на чужом алфавите
+    if l.startswith("ru"):
+        text = re.sub(r"\([^)]*[әіңғүұқөһӘІҢҒҮҰҚӨҺ][^)]*\)", " ", text)
+    elif l.startswith("kk"):
+        text = re.sub(r"\([^)]*[А-Яа-яЁё]{3,}[^)]*\)", lambda m: m.group(0) if re.search(r"[әіңғүұқөһӘІҢҒҮҰҚӨҺ]", m.group(0)) else " ", text)
+
+    # Убираем кавычки без искусственных запятых, чтобы речь звучала плавно
+    text = text.replace("[", " ").replace("]", " ").replace('"', " ").replace("«", " ").replace("»", " ")
+    text = text.replace("f_грунта", "частота грунта" if l.startswith("ru") else ("топырақ жиілігі" if l.startswith("kk") else "ground frequency"))
+    text = text.replace("f_здания", "частота здания" if l.startswith("ru") else ("ғимарат жиілігі" if l.startswith("kk") else "building frequency"))
+    text = re.sub(r"cos\s*\(\s*[θΘ]\s*\)|cos\s*[θΘ]", "косинус тета" if not l.startswith("en") else "cosine theta", text, flags=re.IGNORECASE)
+    text = re.sub(r"px\s*[²2]|\bpx\^2\b", "квадратных пикселей" if l.startswith("ru") else ("шаршы пиксель" if l.startswith("kk") else "square pixels"), text, flags=re.IGNORECASE)
+
     if l.startswith("kk"):
         text = text.replace("≈", " шамамен тең ").replace("≠", " тең емес ").replace("≥", " кем емес ").replace("≤", " артық емес ")
+        text = re.sub(r"(\d+)\s*:\s*(\d+)", r"\1 де \2", text)
         text = re.sub(r"(\d+)\s*[–-]\s*(\d+)\s*%", r"\1 ден \2 пайызға дейін", text)
         text = re.sub(r"(\d+)\s*%", r"\1 пайыз", text)
+        text = re.sub(r"\bWCAG\b", "қолжетімділік стандарты", text, flags=re.IGNORECASE)
+        text = re.sub(r"\bFPS\b", "секундына кадр", text, flags=re.IGNORECASE)
     elif l.startswith("en"):
         text = text.replace("≈", " approximately equals ").replace("≠", " does not equal ").replace("≥", " at least ").replace("≤", " at most ")
+        text = re.sub(r"(\d+)\s*:\s*(\d+)", r"\1 to \2", text)
         text = re.sub(r"(\d+)\s*[–-]\s*(\d+)\s*%", r"\1 to \2 percent", text)
         text = re.sub(r"(\d+)\s*%", r"\1 percent", text)
     else:
         text = text.replace("≈", " примерно равно ").replace("≠", " не равно ").replace("≥", " не меньше ").replace("≤", " не больше ")
+        text = re.sub(r"(\d+)\s*:\s*(\d+)", r"\1 к \2", text)
         text = re.sub(r"(\d+)\s*[–-]\s*(\d+)\s*%", r"от \1 до \2 процентов", text)
         text = re.sub(r"(\d+)\s*%", r"\1 процентов", text)
-    # Длинное тире превращаем в паузу ", — " для естественной интонации определения
+        text = re.sub(r"\bWCAG\b", "стандарту доступности", text, flags=re.IGNORECASE)
+        text = re.sub(r"\bFPS\b", "кадров в секунду", text, flags=re.IGNORECASE)
+        text = re.sub(r"\bLTV\b", "Эл Ти Ви", text)
+        text = re.sub(r"\bCAC\b", "Си Эй Си", text)
+        text = re.sub(r"\bRAG\b", "РАГ", text)
+
+    # Длинное тире превращаем в мягкую паузу ", — " для естественной интонации определения
     text = re.sub(r"\s+—\s+", ", — ", text)
     text = text.replace("–", "-").replace("_", " ").replace("?!", "?")
     text = re.sub(r"[❌✅→←↑↓‖•●◆▪▫*_`~#<>]", " ", text)
     text = re.sub(r"\s+,", ",", text)
     text = re.sub(r",\s*,+", ",", text)
     text = re.sub(r"\s+", " ", text).strip(" ,")
-    if len(text) > 1500:
-        cut = text[:1500]
+    if len(text) > 1800:
+        cut = text[:1800]
         last_space = cut.rfind(" ")
         text = cut[:last_space] if last_space > 200 else cut
     return text.strip()
@@ -226,18 +258,17 @@ def clean_tts_text(raw_text, lang="ru"):
 def resolve_tts_prosody(emotion="", rate="", pitch="", volume="", lang="ru"):
     l = str(lang or "ru").lower()
     emo = str(emotion or "explain").lower()
+    # Чистый естественный тембр лектора без искусственного сдвига частоты
     presets = {
-        "explain": ("-3%", "+2Hz", "+0%"),
-        "hook": ("-2%", "+3Hz", "+2%"),
-        "risk": ("-6%", "-2Hz", "+3%"),
-        "celebrate": ("+2%", "+5Hz", "+2%"),
-        "calm": ("-5%", "+0Hz", "+0%")
+        "explain": ("+0%", "+0Hz", "+0%"),
+        "hook": ("+0%", "+0Hz", "+0%"),
+        "risk": ("-3%", "+0Hz", "+0%"),
+        "celebrate": ("+2%", "+0Hz", "+0%"),
+        "calm": ("-3%", "+0Hz", "+0%")
     }
     def_rate, def_pitch, def_vol = presets.get(emo, presets["explain"])
     if l.startswith("kk") and emo == "explain":
-        def_rate, def_pitch = "-5%", "+3Hz"
-    elif l.startswith("en") and emo == "explain":
-        def_rate, def_pitch = "-2%", "+2Hz"
+        def_rate, def_pitch = "-2%", "+0Hz"
 
     r = str(rate or def_rate).strip()
     p = str(pitch or def_pitch).strip()
@@ -251,25 +282,217 @@ def resolve_tts_prosody(emotion="", rate="", pitch="", volume="", lang="ru"):
     return r, p, v
 
 
-async def _edge_tts_async(text, voice, rate="+0%", pitch="+0Hz", volume="+0%"):
-    communicate = edge_tts.Communicate(
-        text,
-        voice,
-        rate=rate,
-        pitch=pitch,
-        volume=volume,
-        connect_timeout=4,
-        receive_timeout=9,
-    )
-    buf = bytearray()
-    async for chunk in communicate.stream():
-        if chunk.get("type") == "audio":
-            buf.extend(chunk["data"])
-    return bytes(buf)
+_TTS_LOOP = None
+_TTS_THREAD = None
+_TTS_LOOP_LOCK = threading.Lock()
+_DRM_WARMUP_LOCK = threading.Lock()
+_DRM_WARMED_UP = False
 
 
-def synthesize_edge_tts_cached(text, voice, rate="+0%", pitch="+0Hz", volume="+0%"):
-    key = hashlib.sha256(f"{voice}::{rate}::{pitch}::{volume}::{text}".encode("utf-8")).hexdigest()
+def _ensure_tts_loop():
+    global _TTS_LOOP, _TTS_THREAD
+    with _TTS_LOOP_LOCK:
+        if _TTS_LOOP is not None and _TTS_LOOP.is_running():
+            return _TTS_LOOP
+        loop = asyncio.new_event_loop()
+        ready = threading.Event()
+
+        def runner():
+            asyncio.set_event_loop(loop)
+            ready.set()
+            loop.run_forever()
+
+        t = threading.Thread(target=runner, daemon=True, name="EdgeTTSLoop")
+        t.start()
+        ready.wait(timeout=2)
+        _TTS_LOOP = loop
+        _TTS_THREAD = t
+        return _TTS_LOOP
+
+
+async def _edge_tts_async(text, voice, rate="+0%", pitch="+0Hz", volume="+0%", boundary="WordBoundary"):
+    connector = aiohttp.TCPConnector(ssl=SSL_CONTEXT, family=socket.AF_INET, limit=8) if aiohttp is not None else None
+    try:
+        communicate = edge_tts.Communicate(
+            text,
+            voice,
+            rate=rate,
+            pitch=pitch,
+            volume=volume,
+            boundary=boundary,
+            connector=connector,
+            connect_timeout=4,
+            receive_timeout=13,
+        )
+        buf = bytearray()
+        word_timings = []
+        async for chunk in communicate.stream():
+            ctype = chunk.get("type")
+            if ctype == "audio":
+                buf.extend(chunk["data"])
+            elif ctype == "WordBoundary":
+                word_txt = str(chunk.get("text") or "").strip()
+                if word_txt:
+                    word_timings.append({
+                        "w": word_txt,
+                        "s": round((chunk.get("offset") or 0) / 10_000_000, 3),
+                        "d": round((chunk.get("duration") or 0) / 10_000_000, 3),
+                    })
+        return bytes(buf), word_timings
+    finally:
+        if connector is not None and not connector.closed:
+            try:
+                await connector.close()
+            except Exception:
+                pass
+
+
+def _run_edge_tts_sync(text, voice, rate, pitch, volume, timeout=16, boundary="WordBoundary"):
+    global _DRM_WARMED_UP
+    loop = _ensure_tts_loop()
+
+    async def _task():
+        return await asyncio.wait_for(_edge_tts_async(text, voice, rate, pitch, volume, boundary=boundary), timeout=timeout)
+
+    if not _DRM_WARMED_UP:
+        with _DRM_WARMUP_LOCK:
+            if not _DRM_WARMED_UP:
+                fut = asyncio.run_coroutine_threadsafe(_task(), loop)
+                res = fut.result(timeout=timeout + 2)
+                _DRM_WARMED_UP = True
+                return res
+    fut = asyncio.run_coroutine_threadsafe(_task(), loop)
+    return fut.result(timeout=timeout + 2)
+
+
+def _split_tts_chunks_for_fallback(text, limit=180):
+    sents = re.split(r"(?<=[.!?…])\s+", text.strip())
+    chunks = []
+    cur = ""
+    for s in sents:
+        if not s:
+            continue
+        if len(s) > limit:
+            parts = re.split(r"(?<=[,;:])\s+", s)
+        else:
+            parts = [s]
+        for p in parts:
+            p = p.strip()
+            if not p:
+                continue
+            if cur and len(cur) + 1 + len(p) > limit:
+                chunks.append(cur)
+                cur = p
+            else:
+                cur = f"{cur} {p}".strip() if cur else p
+    if cur:
+        chunks.append(cur)
+    return chunks or [text[:limit]]
+
+
+def _cloud_mp3_tts_fallback(text, lang="ru"):
+    tl = "kk" if str(lang).lower().startswith("kk") else ("en" if str(lang).lower().startswith("en") else "ru")
+    chunks = _split_tts_chunks_for_fallback(text, 180)
+    audio_parts = []
+    for ch in chunks:
+        qs = urlencode({"ie": "UTF-8", "client": "tw-ob", "tl": tl, "q": ch})
+        url = f"https://translate.googleapis.com/translate_tts?{qs}"
+        req = Request(url, headers={"User-Agent": "Mozilla/5.0", "Referer": "https://translate.google.com/"})
+        with urlopen(req, timeout=8, context=SSL_CONTEXT) as resp:
+            part = resp.read()
+        if part and len(part) > 100:
+            audio_parts.append(part)
+    audio_bytes = b"".join(audio_parts)
+    if not audio_bytes:
+        raise RuntimeError("Cloud MP3 fallback returned empty audio")
+    words = [w for w in re.findall(r"[^\s]+", text) if w]
+    est_dur = max(1.5, len(audio_bytes) / 8000.0)
+    total_chars = sum(len(w) for w in words) or 1
+    cursor = 0.0
+    word_timings = []
+    for w in words:
+        wd = round(est_dur * (len(w) / total_chars), 3)
+        word_timings.append({"w": w, "s": round(cursor, 3), "d": wd})
+        cursor += wd
+    return audio_bytes, word_timings
+
+
+def _compute_beat_timings(beats, word_timings, lang="ru"):
+    if not isinstance(beats, list) or len(beats) < 2 or not word_timings:
+        return None
+    clean_counts = []
+    for b in beats[:3]:
+        bt = clean_tts_text(str(b or ""), lang)
+        w_cnt = len([w for w in re.split(r"\s+", bt) if re.search(r"[0-9A-Za-zА-Яа-яЁёӘәІіҢңҒғҮүҰұҚқӨөҺһ]", w)])
+        clean_counts.append(max(1, w_cnt))
+    total_b_words = sum(clean_counts) or 1
+    total_t_words = len(word_timings)
+    beat_timings = []
+    word_cursor = 0
+    for idx, cnt in enumerate(clean_counts):
+        start_idx = min(total_t_words - 1, word_cursor)
+        if idx == len(clean_counts) - 1:
+            end_idx = total_t_words - 1
+        else:
+            share = round((cnt / total_b_words) * total_t_words)
+            end_idx = min(total_t_words - 1, max(start_idx, start_idx + share - 1))
+        word_cursor = end_idx + 1
+        s_sec = word_timings[start_idx]["s"]
+        e_sec = word_timings[end_idx]["s"] + max(0.15, word_timings[end_idx]["d"])
+        beat_timings.append({"start": round(s_sec, 3), "end": round(e_sec, 3), "dur": round(max(0.4, e_sec - s_sec), 3)})
+    return beat_timings
+
+
+def _prune_tts_disk_cache():
+    try:
+        if not os.path.isdir(TTS_CACHE_DIR):
+            return
+        mp3s = [
+            (os.path.getmtime(os.path.join(TTS_CACHE_DIR, f)), f)
+            for f in os.listdir(TTS_CACHE_DIR)
+            if f.endswith(".mp3")
+        ]
+        if len(mp3s) <= TTS_DISK_MAX:
+            return
+        mp3s.sort()
+        for _, fn in mp3s[: len(mp3s) - TTS_DISK_MAX]:
+            stem = fn[:-4]
+            for ext in (".mp3", ".json"):
+                p = os.path.join(TTS_CACHE_DIR, stem + ext)
+                if os.path.exists(p):
+                    try:
+                        os.remove(p)
+                    except Exception:
+                        pass
+    except Exception:
+        pass
+
+
+def _purge_fallback_disk_cache():
+    try:
+        if not os.path.isdir(TTS_CACHE_DIR):
+            return
+        for fn in os.listdir(TTS_CACHE_DIR):
+            if not fn.endswith(".json"):
+                continue
+            jpath = os.path.join(TTS_CACHE_DIR, fn)
+            try:
+                with open(jpath, "r", encoding="utf-8") as f:
+                    meta = json.load(f)
+                if isinstance(meta, dict) and meta.get("provider") == "cloud_fallback":
+                    os.remove(jpath)
+                    mp3_p = jpath[:-5] + ".mp3"
+                    if os.path.exists(mp3_p):
+                        os.remove(mp3_p)
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+
+def synthesize_tts_cached(text, voice, rate="+0%", pitch="+0Hz", volume="+0%", lang="ru"):
+    global TTS_CIRCUIT_OPEN_UNTIL, TTS_CONSECUTIVE_FAILS
+    key = hashlib.sha256(f"v3::{voice}::{rate}::{pitch}::{volume}::{text}".encode("utf-8")).hexdigest()
     event = None
     is_owner = False
 
@@ -277,7 +500,25 @@ def synthesize_edge_tts_cached(text, voice, rate="+0%", pitch="+0Hz", volume="+0
         cached = TTS_CACHE.get(key)
         if cached is not None:
             TTS_CACHE.move_to_end(key)
-            return cached
+            return cached["audio"], cached["words"], cached["provider"]
+
+        # Проверка персистентного дискового кэша (только качественный Edge Neural TTS!)
+        disk_mp3 = os.path.join(TTS_CACHE_DIR, f"{key}.mp3")
+        disk_meta = os.path.join(TTS_CACHE_DIR, f"{key}.json")
+        if os.path.exists(disk_mp3) and os.path.exists(disk_meta):
+            try:
+                with open(disk_mp3, "rb") as f_mp3:
+                    audio_bytes = f_mp3.read()
+                with open(disk_meta, "r", encoding="utf-8") as f_meta:
+                    meta_obj = json.load(f_meta)
+                if audio_bytes and isinstance(meta_obj, dict) and meta_obj.get("provider", "edge") == "edge":
+                    entry_val = {"audio": audio_bytes, "words": meta_obj.get("words", []), "provider": "edge"}
+                    TTS_CACHE[key] = entry_val
+                    TTS_CACHE.move_to_end(key)
+                    return audio_bytes, entry_val["words"], "edge"
+            except Exception:
+                pass
+
         inflight = TTS_INFLIGHT.get(key)
         if inflight is None:
             inflight = {"event": threading.Event(), "data": None, "error": None}
@@ -291,37 +532,77 @@ def synthesize_edge_tts_cached(text, voice, rate="+0%", pitch="+0Hz", volume="+0
         with TTS_CACHE_LOCK:
             cached = TTS_CACHE.get(key)
             if cached is not None:
-                return cached
+                return cached["audio"], cached["words"], cached["provider"]
             inflight_err = inflight.get("error")
         raise RuntimeError(inflight_err or "TTS inflight failed")
 
     audio_bytes = b""
+    word_timings = []
+    provider = "edge"
     last_err = None
     try:
         with TTS_SEMAPHORE:
-            for attempt in range(2):
+            cur_text = re.sub(r"\s+", " ", text).strip()
+            if not re.search(r"[0-9A-Za-zА-Яа-яЁёӘәІіҢңҒғҮүҰұҚқӨөҺһ]", cur_text):
+                raise RuntimeError("No speakable characters after normalization")
+
+            edge_allowed = edge_tts is not None and time.time() >= TTS_CIRCUIT_OPEN_UNTIL
+            if edge_allowed:
+                for attempt in range(2):
+                    try:
+                        send_txt = cur_text if attempt == 0 else re.sub(r"[^0-9A-Za-zА-Яа-яЁёӘәІіҢңҒғҮүҰұҚқӨөҺһ.,;:!?…\s-]", " ", cur_text)
+                        send_txt = re.sub(r"\s+", " ", send_txt).strip()
+                        if attempt == 1 and not send_txt.endswith((".", "!", "?")):
+                            send_txt += "."
+                        use_boundary = "SentenceBoundary" if attempt == 1 else "WordBoundary"
+                        audio_bytes, word_timings = _run_edge_tts_sync(send_txt, voice, rate, pitch, volume, timeout=14, boundary=use_boundary)
+                        if audio_bytes:
+                            TTS_CONSECUTIVE_FAILS = 0
+                            provider = "edge"
+                            break
+                        last_err = "Empty Edge TTS audio stream"
+                    except Exception as err:
+                        last_err = str(err) or type(err).__name__
+                        print(f"[Edge TTS retry {attempt + 1}] voice={voice} err={last_err}")
+                        if attempt == 0:
+                            time.sleep(0.2)
+
+            if not audio_bytes:
+                if edge_allowed:
+                    TTS_CONSECUTIVE_FAILS += 1
+                    if TTS_CONSECUTIVE_FAILS >= 12:
+                        TTS_CIRCUIT_OPEN_UNTIL = time.time() + 10.0
+                # Резервный облачный MP3-канал (НЕ кэшируется на диск, чтобы не застревал робот-голос)
                 try:
-                    cur_text = text if attempt == 0 else re.sub(r"[^0-9A-Za-zА-Яа-яЁёӘәІіҢңҒғҮүҰұҚқӨөҺһ.,;:!?…\s-]", " ", text)
-                    cur_text = re.sub(r"\s+", " ", cur_text).strip()
-                    if not re.search(r"[0-9A-Za-zА-Яа-яЁёӘәІіҢңҒғҮүҰұҚқӨөҺһ]", cur_text):
-                        raise RuntimeError("No speakable characters after normalization")
-                    audio_bytes = asyncio.run(asyncio.wait_for(_edge_tts_async(cur_text, voice, rate, pitch, volume), timeout=11))
-                    if audio_bytes:
-                        break
-                    last_err = "Empty TTS audio stream"
-                except Exception as err:
-                    last_err = str(err) or type(err).__name__
-                    if attempt == 0:
-                        time.sleep(0.25)
+                    audio_bytes, word_timings = _cloud_mp3_tts_fallback(cur_text, lang)
+                    provider = "cloud_fallback"
+                except Exception as fb_err:
+                    last_err = f"{last_err or 'Edge unavailable'}; fallback: {fb_err}"
+
         if not audio_bytes:
-            raise RuntimeError(last_err or "Empty TTS audio stream")
+            raise RuntimeError(last_err or "All TTS providers failed")
+
         with TTS_CACHE_LOCK:
-            TTS_CACHE[key] = audio_bytes
-            TTS_CACHE.move_to_end(key)
-            while len(TTS_CACHE) > TTS_CACHE_MAX:
-                TTS_CACHE.popitem(last=False)
-            TTS_INFLIGHT[key]["data"] = audio_bytes
-        return audio_bytes
+            entry_val = {"audio": audio_bytes, "words": word_timings, "provider": provider}
+            if provider == "edge":
+                TTS_CACHE[key] = entry_val
+                TTS_CACHE.move_to_end(key)
+                while len(TTS_CACHE) > TTS_CACHE_MAX:
+                    TTS_CACHE.popitem(last=False)
+            TTS_INFLIGHT[key]["data"] = entry_val
+
+        if provider == "edge":
+            try:
+                os.makedirs(TTS_CACHE_DIR, exist_ok=True)
+                with open(os.path.join(TTS_CACHE_DIR, f"{key}.mp3"), "wb") as f_mp3:
+                    f_mp3.write(audio_bytes)
+                with open(os.path.join(TTS_CACHE_DIR, f"{key}.json"), "w", encoding="utf-8") as f_meta:
+                    json.dump({"words": word_timings, "provider": provider}, f_meta, ensure_ascii=False)
+                _prune_tts_disk_cache()
+            except Exception:
+                pass
+
+        return audio_bytes, word_timings, provider
     except Exception as err:
         with TTS_CACHE_LOCK:
             if key in TTS_INFLIGHT:
@@ -333,17 +614,64 @@ def synthesize_edge_tts_cached(text, voice, rate="+0%", pitch="+0Hz", volume="+0
             if entry:
                 entry["event"].set()
 
+
+def resolve_data_dir():
+    if os.environ.get("VERCEL") or os.environ.get("VERCEL_ENV"):
+        d = "/tmp/lecture_ai_data"
+        os.makedirs(d, exist_ok=True)
+        return d
+    local_d = os.path.join(ROOT_DIR, "data")
+    try:
+        os.makedirs(local_d, exist_ok=True)
+        probe = os.path.join(local_d, ".write_test")
+        with open(probe, "w", encoding="utf-8") as f:
+            f.write("1")
+        os.remove(probe)
+        return local_d
+    except Exception:
+        d = "/tmp/lecture_ai_data"
+        os.makedirs(d, exist_ok=True)
+        return d
+
+
+def get_lan_ip():
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.settimeout(0.4)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        if ip and not ip.startswith("127."):
+            return ip
+    except Exception:
+        pass
+    return "127.0.0.1"
+
+
 PORT = int(os.environ.get("PORT", 8080))
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_DIR = os.path.join(ROOT_DIR, "data")
+DATA_DIR = resolve_data_dir()
+TTS_CACHE_DIR = os.path.join(DATA_DIR, "tts_cache")
 DB_PATH = os.path.join(DATA_DIR, "lecture_ai.db")
 DB_LOCK = threading.Lock()
 
 
+def get_db_connection():
+    conn = sqlite3.connect(DB_PATH, timeout=10.0)
+    try:
+        conn.execute("PRAGMA journal_mode=WAL;")
+        conn.execute("PRAGMA synchronous=NORMAL;")
+    except Exception:
+        pass
+    return conn
+
+
 def init_db():
     os.makedirs(DATA_DIR, exist_ok=True)
+    os.makedirs(TTS_CACHE_DIR, exist_ok=True)
+    _purge_fallback_disk_cache()
     with DB_LOCK:
-        conn = sqlite3.connect(DB_PATH)
+        conn = get_db_connection()
         cur = conn.cursor()
         cur.execute("""
             CREATE TABLE IF NOT EXISTS lectures (
@@ -680,9 +1008,17 @@ class LectureAIHandler(http.server.SimpleHTTPRequestHandler):
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         self.send_response(status_code)
         self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
+
+    def do_OPTIONS(self):
+        self.send_response(204)
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.end_headers()
 
     def do_GET(self):
         parsed = urlparse(self.path)
@@ -691,20 +1027,29 @@ class LectureAIHandler(http.server.SimpleHTTPRequestHandler):
 
         # Защита служебных файлов (с учётом регистронезависимой macOS APFS и URL-кодирования)
         if (
-            norm_path in ("/server.py", "/readme.md", "/vercel.json", "/data")
-            or norm_path.startswith("/data/")
+            norm_path in ("/server.py", "/readme.md", "/vercel.json", "/render.yaml", "/requirements.txt", "/data", "/api", "/api/index.py", "/docs")
+            or norm_path.startswith(("/data/", "/docs/"))
+            or norm_path.endswith(".docx")
             or "/." in norm_path
         ):
             self.send_error(403, "Forbidden")
             return
 
         if path == "/api/health":
-            self.send_json(200, {"status": "ok", "service": "Lecture AI Studio (ArchAI)", "ttsAvailable": edge_tts is not None})
+            lan_ip = get_lan_ip()
+            self.send_json(200, {
+                "status": "ok",
+                "service": "Lecture AI Studio (ArchAI)",
+                "ttsAvailable": True,
+                "ttsHealthy": edge_tts is not None and time.time() >= TTS_CIRCUIT_OPEN_UNTIL,
+                "cloudMode": "vercel" if os.environ.get("VERCEL") else "server",
+                "lanUrl": f"http://{lan_ip}:{PORT}" if lan_ip != "127.0.0.1" else ""
+            })
             return
 
         if path == "/api/lectures":
             with DB_LOCK:
-                conn = sqlite3.connect(DB_PATH)
+                conn = get_db_connection()
                 cur = conn.cursor()
                 cur.execute("SELECT id, content_hash, course_title, domain_id, terms_count, scenes_count, created_at FROM lectures ORDER BY created_at DESC LIMIT 30")
                 rows = [
@@ -726,7 +1071,7 @@ class LectureAIHandler(http.server.SimpleHTTPRequestHandler):
         if path.startswith("/api/lectures/"):
             lec_id = unquote(path.split("/api/lectures/", 1)[1]).strip()
             with DB_LOCK:
-                conn = sqlite3.connect(DB_PATH)
+                conn = get_db_connection()
                 cur = conn.cursor()
                 cur.execute("SELECT payload_json FROM lectures WHERE id = ? OR content_hash = ?", (lec_id, lec_id))
                 row = cur.fetchone()
@@ -742,7 +1087,7 @@ class LectureAIHandler(http.server.SimpleHTTPRequestHandler):
 
         if path == "/api/feedback":
             with DB_LOCK:
-                conn = sqlite3.connect(DB_PATH)
+                conn = get_db_connection()
                 cur = conn.cursor()
                 cur.execute("SELECT id, tester_name, university, user_group, clarity_score, terms_score, animation_score, nps_score, comment, course_title, created_at FROM feedback ORDER BY id DESC")
                 items = [
@@ -773,7 +1118,7 @@ class LectureAIHandler(http.server.SimpleHTTPRequestHandler):
         if path.startswith("/api/lectures/"):
             lec_id = unquote(path.split("/api/lectures/", 1)[1]).strip()
             with DB_LOCK:
-                conn = sqlite3.connect(DB_PATH)
+                conn = get_db_connection()
                 cur = conn.cursor()
                 cur.execute("DELETE FROM lectures WHERE id = ? OR content_hash = ?", (lec_id, lec_id))
                 deleted = cur.rowcount
@@ -898,7 +1243,7 @@ class LectureAIHandler(http.server.SimpleHTTPRequestHandler):
                 s_cnt = len(scenes_list)
                 now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
                 with DB_LOCK:
-                    conn = sqlite3.connect(DB_PATH)
+                    conn = get_db_connection()
                     cur = conn.cursor()
                     cur.execute("""
                         INSERT OR REPLACE INTO lectures (id, content_hash, course_title, domain_id, terms_count, scenes_count, payload_json, created_at)
@@ -919,7 +1264,7 @@ class LectureAIHandler(http.server.SimpleHTTPRequestHandler):
                 now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
                 clamp_score = lambda val, lo, hi, dflt: max(lo, min(hi, int(val if val is not None else dflt)))
                 with DB_LOCK:
-                    conn = sqlite3.connect(DB_PATH)
+                    conn = get_db_connection()
                     cur = conn.cursor()
                     cur.execute("""
                         INSERT INTO feedback (tester_name, university, user_group, clarity_score, terms_score, animation_score, nps_score, comment, course_title, created_at)
@@ -957,8 +1302,6 @@ class LectureAIHandler(http.server.SimpleHTTPRequestHandler):
             return self.send_json(200, {"translations": translations, "fallback": used_fallback})
 
         if parsed.path == "/api/tts":
-            if edge_tts is None:
-                return self.send_json(501, {"error": "edge-tts is not installed on server"})
             try:
                 payload = json.loads(body.decode("utf-8")) if body else {}
             except Exception:
@@ -968,6 +1311,7 @@ class LectureAIHandler(http.server.SimpleHTTPRequestHandler):
             raw_lang = payload.get("lang")
             emotion = payload.get("emotion", "explain")
             voice_gender = str(payload.get("voiceGender") or "female").lower()
+            beats = payload.get("beats") if isinstance(payload.get("beats"), list) else None
             rate = payload.get("rate", "")
             pitch = payload.get("pitch", "")
             volume = payload.get("volume", "")
@@ -992,19 +1336,31 @@ class LectureAIHandler(http.server.SimpleHTTPRequestHandler):
             r_val, p_val, v_val = resolve_tts_prosody(emotion, rate, pitch, volume, lang)
 
             try:
-                audio_bytes = synthesize_edge_tts_cached(text, voice, r_val, p_val, v_val)
+                audio_bytes, word_timings, provider = synthesize_tts_cached(text, voice, r_val, p_val, v_val, lang)
             except Exception as err:
                 print(f"[TTS 502] voice={voice} err={err}")
                 try:
-                    return self.send_json(502, {"error": f"Edge TTS failed: {err}"})
+                    return self.send_json(502, {"error": f"TTS failed: {err}"})
                 except (BrokenPipeError, ConnectionResetError):
                     return
+
+            beat_timings = _compute_beat_timings(beats, word_timings, lang)
+            timings_payload = json.dumps(
+                {"words": word_timings[:240], "beats": beat_timings},
+                ensure_ascii=False,
+                separators=(",", ":")
+            ).encode("utf-8")
+            timings_b64 = base64.b64encode(timings_payload).decode("ascii")
 
             try:
                 self.send_response(200)
                 self.send_header("Content-Type", "audio/mpeg")
                 self.send_header("Content-Length", str(len(audio_bytes)))
-                self.send_header("Cache-Control", "public, max-age=86400")
+                self.send_header("Cache-Control", "public, max-age=604800, immutable")
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.send_header("Access-Control-Expose-Headers", "X-TTS-Timings, X-TTS-Provider")
+                self.send_header("X-TTS-Provider", provider)
+                self.send_header("X-TTS-Timings", timings_b64)
                 self.end_headers()
                 self.wfile.write(audio_bytes)
             except (BrokenPipeError, ConnectionResetError):
@@ -1019,5 +1375,8 @@ if __name__ == "__main__":
     http.server.ThreadingHTTPServer.allow_reuse_address = True
     http.server.ThreadingHTTPServer.daemon_threads = True
     with http.server.ThreadingHTTPServer(("", PORT), LectureAIHandler) as httpd:
-        print(f"Lecture AI Studio запущен на http://localhost:{PORT}")
+        lan_ip = get_lan_ip()
+        print(f"Lecture AI Studio запущен локально: http://localhost:{PORT}")
+        if lan_ip != "127.0.0.1":
+            print(f"Вход с телефона (в той же Wi-Fi сети): http://{lan_ip}:{PORT}")
         httpd.serve_forever()

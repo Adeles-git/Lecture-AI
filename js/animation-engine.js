@@ -42,6 +42,8 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
     this.activeAudioEl = null;
     this.onTtsNotice = null;
     this.onAudioProgress = null;
+    this.onActiveCaptionChange = null;
+    this.onBackendChange = null;
     this.lastSpokenSceneIdx = -1;
     this.ttsRunId = 0;
     this.streamRunId = 0;
@@ -49,8 +51,22 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
     this.ttsTimer = null;
     this.isExporting = false;
     this.cancelExportFlag = false;
+    this._audioUnlocked = false;
+    this._idbPromise = null;
+    this._speechKeepAliveTimer = null;
+    this._lastCaptionEmitKey = "";
+    this.activeSources = new Set();
+    this.prefetchRunId = 0;
     this._backdropCache = new Map();
     this._camState = { x: 0, y: 0, zoom: 1 };
+
+    if (typeof document !== "undefined") {
+      document.addEventListener("visibilitychange", () => {
+        if (!document.hidden && this.audioCtx && this.audioCtx.state !== "running") {
+          this.audioCtx.resume().catch(() => {});
+        }
+      });
+    }
 
     // Состояние процедурного 2D-тьютора (Rive-подход)
     this.tutor = {
@@ -153,14 +169,88 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
     const Ctx = typeof window !== "undefined" && (window.AudioContext || window.webkitAudioContext);
     if (Ctx) {
       this.audioCtx = new Ctx();
+      this.audioCtx.onstatechange = () => {
+        if (
+          this.audioCtx &&
+          (this.audioCtx.state === "interrupted" || this.audioCtx.state === "suspended") &&
+          this.isPlaying
+        ) {
+          this.audioCtx.resume().catch(() => {});
+        }
+      };
     }
     return this.audioCtx;
   }
 
   unlockAudio() {
+    // Разрешает звук на iPhone даже при включённом боковом рычажке «Без звука» (iOS 17+ AudioSession)
+    try {
+      if (typeof navigator !== "undefined" && navigator.audioSession && "type" in navigator.audioSession) {
+        navigator.audioSession.type = "playback";
+      }
+    } catch (_) {}
+
     const ctx = this.ensureAudioContext();
     if (ctx && ctx.state === "suspended") {
       ctx.resume().catch(() => {});
+    }
+    if (ctx && !this._audioUnlocked) {
+      this._audioUnlocked = true;
+      try {
+        const silentBuf = ctx.createBuffer(1, 1, 22050);
+        const src = ctx.createBufferSource();
+        src.buffer = silentBuf;
+        src.connect(ctx.destination);
+        src.start(0);
+      } catch (_) {}
+      try {
+        if (typeof Audio !== "undefined") {
+          const primer = new Audio("data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA");
+          primer.volume = 0.01;
+          primer.play().catch(() => {});
+        }
+      } catch (_) {}
+    }
+  }
+
+  warmupServer() {
+    if (typeof window === "undefined" || window.location?.protocol === "file:") return;
+    fetch("/api/health", { method: "GET", cache: "no-store" }).catch(() => {});
+  }
+
+  play() {
+    if (!this.isReady) return;
+    this.unlockAudio();
+    this.isPlaying = true;
+    this.lastFrameTs = performance.now();
+    if (this.ttsEnabled) {
+      this.lastSpokenSceneIdx = -1;
+      const info = this.getCurrentSceneInfo();
+      if (info.scene) {
+        this.checkTts(info, info.localTime);
+      }
+    }
+  }
+
+  pause() {
+    this.isPlaying = false;
+    this.stopTts();
+    this.lastSpokenSceneIdx = -1;
+  }
+
+  togglePlay() {
+    if (this.isPlaying) this.pause();
+    else this.play();
+    return this.isPlaying;
+  }
+
+  _notifyBackendChange() {
+    if (this.onBackendChange) {
+      this.onBackendChange({
+        mode: this.ttsEnabled ? this.ttsBackendMode : "subtitles_only",
+        provider: this.ttsProvider || "edge",
+        enabled: this.ttsEnabled
+      });
     }
   }
 
@@ -174,8 +264,15 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
       if (this.ttsBackendMode === "neural_buffer") {
         const info = this.getCurrentSceneInfo();
         this.prefetchSequential(info.index);
+        if (this.isPlaying && info.scene) {
+          this.checkTts(info, info.localTime);
+        }
+      } else if (this.isPlaying) {
+        const info = this.getCurrentSceneInfo();
+        if (info.scene) this.checkTts(info, info.localTime);
       }
     }
+    this._notifyBackendChange();
   }
 
   setPlaybackSpeed(speed) {
@@ -222,10 +319,38 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
         const waitingAudioFetch =
           this.ttsEnabled &&
           this.audioPlaybackState.loading &&
-          now - this.audioPlaybackState.loadingSince < 3500;
+          now - this.audioPlaybackState.loadingSince < 4500;
 
-        if (waitingAudioFetch) {
+        // В режиме браузерного голоса не обрываем недосказанную фразу на границе сцены
+        const waitingBrowserSpeech =
+          this.ttsEnabled &&
+          this.ttsBackendMode === "browser_speech" &&
+          typeof window !== "undefined" &&
+          window.speechSynthesis?.speaking &&
+          info.scene &&
+          info.localTime >= (info.scene.durationSec || 10) - 0.15 &&
+          info.localTime < (info.scene.durationSec || 10) + 4.0;
+
+        if (waitingAudioFetch || waitingBrowserSpeech) {
           dt = 0;
+        }
+
+        // Audio-Master Clock: при просадке FPS или после сворачивания вкладки подтягиваем таймлайн к часам AudioContext
+        if (
+          !waitingAudioFetch &&
+          this.ttsEnabled &&
+          this.audioSync &&
+          this.audioPlaybackState.active &&
+          this.audioCtx &&
+          this.audioCtx.state === "running" &&
+          this.audioSync.sceneIndex === info.index
+        ) {
+          const targetLocal = 0.25 + (this.audioCtx.currentTime - this.audioSync.startCtxTime) * (this.audioSync.rate || this.playbackSpeed);
+          if (Math.abs(targetLocal - info.localTime) > 0.16 && targetLocal >= 0 && targetLocal < (info.scene?.durationSec || 10)) {
+            const sceneStart = this.currentTime - info.localTime;
+            this.currentTime = sceneStart + targetLocal;
+            dt = 0;
+          }
         }
 
         this.currentTime += dt;
@@ -252,14 +377,25 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
 
   stopTts() {
     this.ttsRunId++;
+    this.prefetchRunId++;
+    this.prefetchQueueRunning = false;
     this.audioSync = null;
     this.audioPlaybackState = { active: false, loading: false, loadingSince: 0 };
     if (this.ttsTimer) {
       clearTimeout(this.ttsTimer);
       this.ttsTimer = null;
     }
-    const hadBrowserUtterance = Boolean(this.activeUtterance);
     this.activeUtterance = null;
+    if (this.activeSources) {
+      for (const src of this.activeSources) {
+        try {
+          src.onended = null;
+          src.stop();
+          src.disconnect();
+        } catch (_) {}
+      }
+      this.activeSources.clear();
+    }
     if (this.activeSourceNode) {
       try {
         this.activeSourceNode.onended = null;
@@ -276,7 +412,7 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
       } catch (_) {}
       this.activeAudioEl = null;
     }
-    if ((hadBrowserUtterance || this.ttsBackendMode === "browser_speech") && window.speechSynthesis) {
+    if (typeof window !== "undefined" && window.speechSynthesis) {
       try {
         window.speechSynthesis.cancel();
       } catch (_) {}
@@ -392,7 +528,7 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
     return clauses;
   }
 
-  async probeTtsServer(timeoutMs = 1400) {
+  async probeTtsServer(timeoutMs = 4500) {
     if (typeof window !== "undefined" && window.location && window.location.protocol === "file:") {
       return false;
     }
@@ -405,6 +541,7 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
       const ctype = (resp.headers.get("content-type") || "").toLowerCase();
       if (!ctype.includes("application/json")) return false;
       const data = await resp.json();
+      if (data?.lanUrl) this.serverLanUrl = data.lanUrl;
       return data?.status === "ok" && data?.ttsAvailable !== false;
     } catch (_) {
       clearTimeout(timer);
@@ -546,24 +683,134 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
     speakNext();
   }
 
+  _openAudioIdb() {
+    if (this._idbPromise) return this._idbPromise;
+    if (typeof indexedDB === "undefined") return Promise.resolve(null);
+    this._idbPromise = new Promise((resolve) => {
+      try {
+        const req = indexedDB.open("lecture_ai_tts_idb", 1);
+        req.onupgradeneeded = () => {
+          const db = req.result;
+          if (!db.objectStoreNames.contains("clips")) {
+            db.createObjectStore("clips", { keyPath: "key" });
+          }
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => resolve(null);
+      } catch (_) {
+        resolve(null);
+      }
+    });
+    return this._idbPromise;
+  }
+
+  async _idbGetAudio(key) {
+    try {
+      const db = await this._openAudioIdb();
+      if (!db) return null;
+      return await new Promise((resolve) => {
+        const tx = db.transaction("clips", "readonly");
+        const req = tx.objectStore("clips").get(key);
+        req.onsuccess = () => resolve(req.result || null);
+        req.onerror = () => resolve(null);
+      });
+    } catch (_) {
+      return null;
+    }
+  }
+
+  async _idbPutAudio(key, arrayBuf, words, beats, provider) {
+    try {
+      const db = await this._openAudioIdb();
+      if (!db || !arrayBuf) return;
+      const tx = db.transaction("clips", "readwrite");
+      const store = tx.objectStore("clips");
+      store.put({ key, arrayBuf: arrayBuf.slice(0), words: words || [], beats: beats || null, provider: provider || "edge", ts: Date.now() });
+    } catch (_) {}
+  }
+
+  trimAudioBufferSilence(audioBuffer, threshold = 0.008) {
+    if (!audioBuffer || audioBuffer.length < 1000) return { buffer: audioBuffer, trimStartSec: 0 };
+    const ctx = this.ensureAudioContext();
+    if (!ctx) return { buffer: audioBuffer, trimStartSec: 0 };
+    const ch0 = audioBuffer.getChannelData(0);
+    const sr = audioBuffer.sampleRate || 24000;
+    let startIdx = 0;
+    let endIdx = ch0.length - 1;
+    while (startIdx < ch0.length && Math.abs(ch0[startIdx]) < threshold) startIdx++;
+    while (endIdx > startIdx && Math.abs(ch0[endIdx]) < threshold) endIdx--;
+
+    const padStart = Math.max(0, startIdx - Math.round(sr * 0.03));
+    const padEnd = Math.min(ch0.length - 1, endIdx + Math.round(sr * 0.06));
+    const newLen = padEnd - padStart + 1;
+    if (newLen < sr * 0.3 || newLen >= ch0.length - Math.round(sr * 0.08)) {
+      return { buffer: audioBuffer, trimStartSec: 0 };
+    }
+    const out = ctx.createBuffer(audioBuffer.numberOfChannels, newLen, sr);
+    for (let ch = 0; ch < audioBuffer.numberOfChannels; ch++) {
+      const src = audioBuffer.getChannelData(ch);
+      out.getChannelData(ch).set(src.subarray(padStart, padEnd + 1));
+    }
+    return { buffer: out, trimStartSec: padStart / sr };
+  }
+
+  _decodeTimingsHeader(resp) {
+    try {
+      const b64 = resp.headers.get("X-TTS-Timings");
+      if (!b64) return { words: [], beats: null };
+      const bin = atob(b64);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      const jsonStr = new TextDecoder("utf-8").decode(bytes);
+      const parsed = JSON.parse(jsonStr);
+      return {
+        words: Array.isArray(parsed?.words) ? parsed.words : [],
+        beats: Array.isArray(parsed?.beats) ? parsed.beats : null
+      };
+    } catch (_) {
+      return { words: [], beats: null };
+    }
+  }
+
   async fetchEdgeTtsBuffer(cleanText, locale, opts = {}) {
     const {
-      timeoutMs = 9500,
+      timeoutMs = 30000,
       maxAttempts = 2,
       externalSignal = null,
       emotion = "explain",
+      beats = null,
       rate = "",
       pitch = "",
       volume = ""
     } = opts;
     const voiceGender = this.voiceGender || "female";
-    const cacheKey = `edge::${locale}::${voiceGender}::${emotion}::${rate}::${pitch}::${cleanText}`;
+    const beatSig = Array.isArray(beats) ? beats.join("|").slice(0, 64) : "";
+    const cacheKey = `edge3::${locale}::${voiceGender}::${emotion}::${rate}::${pitch}::${beatSig}::${cleanText}`;
     const cachedBuf = this.audioBufferCache.get(cacheKey);
     if (cachedBuf) return cachedBuf;
 
     let pendingPromise = this.pendingAudioFetches.get(cacheKey);
     if (!pendingPromise) {
       pendingPromise = (async () => {
+        const ctx = this.ensureAudioContext();
+        if (!ctx) throw new Error("Web Audio API unavailable");
+
+        // 1. Проверяем клиентский IndexedDB кэш (мгновенно и без трафика на 4G)
+        const idbEntry = await this._idbGetAudio(cacheKey);
+        if (idbEntry?.arrayBuf) {
+          try {
+            const decoded = await ctx.decodeAudioData(idbEntry.arrayBuf.slice(0));
+            const { buffer, trimStartSec } = this.trimAudioBufferSilence(decoded);
+            const adjWords = (idbEntry.words || []).map((w) => ({ ...w, s: Math.max(0, +(w.s - trimStartSec).toFixed(3)) }));
+            const adjBeats = Array.isArray(idbEntry.beats)
+              ? idbEntry.beats.map((b) => ({ ...b, start: Math.max(0, +(b.start - trimStartSec).toFixed(3)), end: Math.max(0.2, +(b.end - trimStartSec).toFixed(3)) }))
+              : null;
+            buffer._ttsMeta = { wordTimings: adjWords, beatTimings: adjBeats, provider: idbEntry.provider || "edge" };
+            this.audioBufferCache.set(cacheKey, buffer);
+            return buffer;
+          } catch (_) {}
+        }
+
         let lastErr = null;
         for (let attempt = 0; attempt < maxAttempts; attempt++) {
           const ctrl = new AbortController();
@@ -577,6 +824,7 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
                 lang: locale,
                 emotion,
                 voiceGender,
+                beats,
                 rate,
                 pitch,
                 volume
@@ -585,21 +833,32 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
             });
             clearTimeout(timer);
             if (!resp.ok) {
-              throw new Error(`Edge TTS HTTP ${resp.status}`);
+              throw new Error(`TTS HTTP ${resp.status}`);
             }
+            const provider = resp.headers.get("X-TTS-Provider") || "edge";
+            const metaTimings = this._decodeTimingsHeader(resp);
             const arrayBuf = await resp.arrayBuffer();
             if (!arrayBuf || arrayBuf.byteLength < 100) {
-              throw new Error("Empty Edge TTS audio");
+              throw new Error("Empty TTS audio");
             }
-            const ctx = this.ensureAudioContext();
-            if (!ctx) throw new Error("Web Audio API unavailable");
-            const audioBuffer = await ctx.decodeAudioData(arrayBuf);
+            if (provider === "edge") {
+              this._idbPutAudio(cacheKey, arrayBuf, metaTimings.words, metaTimings.beats, provider);
+            }
+            const decoded = await ctx.decodeAudioData(arrayBuf.slice(0));
+            const { buffer, trimStartSec } = this.trimAudioBufferSilence(decoded);
+            const adjWords = (metaTimings.words || []).map((w) => ({ ...w, s: Math.max(0, +(w.s - trimStartSec).toFixed(3)) }));
+            const adjBeats = Array.isArray(metaTimings.beats)
+              ? metaTimings.beats.map((b) => ({ ...b, start: Math.max(0, +(b.start - trimStartSec).toFixed(3)), end: Math.max(0.2, +(b.end - trimStartSec).toFixed(3)) }))
+              : null;
+            buffer._ttsMeta = { wordTimings: adjWords, beatTimings: adjBeats, provider };
+            this.ttsProvider = provider;
+
             if (this.audioBufferCache.size >= 144) {
               const firstKey = this.audioBufferCache.keys().next().value;
               this.audioBufferCache.delete(firstKey);
             }
-            this.audioBufferCache.set(cacheKey, audioBuffer);
-            return audioBuffer;
+            this.audioBufferCache.set(cacheKey, buffer);
+            return buffer;
           } catch (err) {
             clearTimeout(timer);
             lastErr = err;
@@ -608,7 +867,7 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
             }
           }
         }
-        throw lastErr || new Error("Edge TTS failed");
+        throw lastErr || new Error("TTS failed");
       })().finally(() => {
         this.pendingAudioFetches.delete(cacheKey);
       });
@@ -633,79 +892,27 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
     });
   }
 
-  // Склейка 3 битов озвучки в единый бесшовный AudioBuffer с естественными интонационными паузами
-  stitchBeatAudioBuffers(buffers, pauseSec = 0.28) {
-    const valid = (buffers || []).filter(Boolean);
-    if (!valid.length) return null;
-    if (valid.length === 1) return valid[0];
-    const ctx = this.ensureAudioContext();
-    if (!ctx) return valid[0];
-    const sampleRate = valid[0].sampleRate || 24000;
-    const channels = valid[0].numberOfChannels || 1;
-    const pauseSamples = Math.round(pauseSec * sampleRate);
-    const totalSamples =
-      valid.reduce((acc, b) => acc + b.length, 0) + pauseSamples * Math.max(0, valid.length - 1);
-    const out = ctx.createBuffer(channels, totalSamples, sampleRate);
-
-    let offset = 0;
-    for (let i = 0; i < valid.length; i++) {
-      const b = valid[i];
-      for (let ch = 0; ch < channels; ch++) {
-        const dst = out.getChannelData(ch);
-        const src = b.getChannelData(Math.min(ch, b.numberOfChannels - 1));
-        dst.set(src, offset);
-      }
-      offset += b.length + (i < valid.length - 1 ? pauseSamples : 0);
-    }
-    return out;
-  }
-
-  // Синтез одной сцены (с ретраями и побитовыми паузами)
+  // Цельный студийный синтез сцены (1 запрос вместо 3, ровная интонация + WordBoundary таймкоды)
   async _synthesizeSingleSceneBuffer(sc, abortSignal = null) {
     const cleanText = this.prepareClausesForTts(sc?.caption, sc?.title).join(" ");
     if (!cleanText) return null;
-    const beats = Array.isArray(sc?.beats) && sc.beats.length >= 2 ? sc.beats.slice(0, 3) : null;
-    let finalBuf = null;
-    if (beats) {
-      const beatEmotions = [
-        sc.emotion === "risk" ? "risk" : "hook",
-        "explain",
-        sc.emotion === "celebrate" ? "celebrate" : sc.emotion === "risk" ? "risk" : "hook"
-      ];
-      const beatTexts = beats.map((b) => this.prepareClausesForTts(b?.text, "").join(" "));
-      if (beatTexts.some(Boolean)) {
-        const ctx = this.ensureAudioContext();
-        const beatBufs = await Promise.all(
-          beatTexts.map((bt, bIdx) =>
-            bt
-              ? this.fetchEdgeTtsBuffer(bt, this.ttsLang, {
-                  timeoutMs: 10000,
-                  maxAttempts: 2,
-                  externalSignal: abortSignal,
-                  emotion: beatEmotions[bIdx] || "explain"
-                })
-              : Promise.resolve(ctx ? ctx.createBuffer(1, Math.round(ctx.sampleRate * 0.35), ctx.sampleRate) : null)
-          )
-        );
-        const validBeatBufs = beatBufs.filter(Boolean);
-        if (validBeatBufs.length === beats.length) {
-          sc.beatDurations = validBeatBufs.map((b) => +b.duration.toFixed(3));
-          finalBuf = this.stitchBeatAudioBuffers(validBeatBufs, 0.28);
-        }
-      }
-    }
-    if (!finalBuf) {
-      finalBuf = await this.fetchEdgeTtsBuffer(cleanText, this.ttsLang, {
-        timeoutMs: 10000,
-        maxAttempts: 2,
-        externalSignal: abortSignal,
-        emotion: sc?.emotion || "explain"
-      });
-    }
+    const beats = Array.isArray(sc?.beats) && sc.beats.length >= 2 ? sc.beats.slice(0, 3).map((b) => b?.text || "") : null;
+    const finalBuf = await this.fetchEdgeTtsBuffer(cleanText, this.ttsLang, {
+      timeoutMs: 30000,
+      maxAttempts: 2,
+      externalSignal: abortSignal,
+      emotion: sc?.emotion || "explain",
+      beats
+    });
+    const meta = finalBuf?._ttsMeta || {};
     sc.audioBuffer = finalBuf;
-    const baseDur = sc.baseDurationSec || sc.durationSec || 10;
+    sc.wordTimings = Array.isArray(meta.wordTimings) ? meta.wordTimings : null;
+    sc.beatTimings = Array.isArray(meta.beatTimings) ? meta.beatTimings : null;
+    sc.beatDurations = Array.isArray(meta.beatTimings) ? meta.beatTimings.map((b) => b.dur) : null;
+    sc.ttsProvider = meta.provider || "edge";
     sc.speechDurationSec = +finalBuf.duration.toFixed(2);
-    sc.durationSec = +Math.max(baseDur, 0.25 + finalBuf.duration + 1.25).toFixed(2);
+    // Длительность сцены СТРОГО по реальной длине аудио + 0.30 с вход + 0.95 с естественной паузы (без пустой тишины!)
+    sc.durationSec = +Math.max(4.5, 0.30 + finalBuf.duration + 0.95).toFixed(2);
     sc.finalCps = +(String(sc.caption || "").length / sc.durationSec).toFixed(1);
     return finalBuf;
   }
@@ -720,7 +927,7 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
     this.ttsLang = locale || this.ttsLang || "ru-RU";
     this.ensureAudioContext();
 
-    const serverAlive = await this.probeTtsServer(1400);
+    const serverAlive = await this.probeTtsServer(4500);
     if (abortSignal?.aborted || myStreamId !== this.streamRunId) return;
 
     let useNeuralServer = serverAlive;
@@ -802,7 +1009,7 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
     this.ttsLang = locale || this.ttsLang || "ru-RU";
     this.ensureAudioContext();
 
-    const serverAlive = await this.probeTtsServer(1400);
+    const serverAlive = await this.probeTtsServer(4500);
     if (abortSignal?.aborted) throw new DOMException("Cancelled", "AbortError");
 
     let useNeuralServer = serverAlive;
@@ -820,7 +1027,7 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
         });
       }
       let nextIdx = 0;
-      const concurrency = Math.min(3, total);
+      const concurrency = Math.min(2, total);
       const runWorker = async () => {
         while (nextIdx < total) {
           if (abortSignal?.aborted) throw new DOMException("Cancelled", "AbortError");
@@ -901,26 +1108,31 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
     }
 
     this.recalcTotalDuration();
+    this._notifyBackendChange();
     return { backendMode: this.ttsBackendMode, totalDuration: this.totalDuration };
   }
 
   async prefetchSequential(startIdx = 0) {
     if (this.prefetchQueueRunning || !this.ttsEnabled || !this.scenes?.length || this.ttsBackendMode !== "neural_buffer") return;
+    const myPrefetchId = ++this.prefetchRunId;
     this.prefetchQueueRunning = true;
     try {
       const len = this.scenes.length;
       for (let offset = 0; offset < len; offset++) {
-        if (!this.ttsEnabled) break;
+        if (!this.ttsEnabled || myPrefetchId !== this.prefetchRunId) break;
         const idx = (startIdx + offset) % len;
         const sc = this.scenes[idx];
+        if (sc?.audioBuffer) continue;
         const clean = this.prepareClausesForTts(sc?.caption, sc?.title).join(" ");
         if (!clean) continue;
         try {
-          await this.fetchEdgeTtsBuffer(clean, this.ttsLang);
+          await this.fetchEdgeTtsBuffer(clean, this.ttsLang, { emotion: sc?.emotion || "explain" });
         } catch (_) {}
       }
     } finally {
-      this.prefetchQueueRunning = false;
+      if (myPrefetchId === this.prefetchRunId) {
+        this.prefetchQueueRunning = false;
+      }
     }
   }
 
@@ -981,6 +1193,7 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
 
     const delaySec = sceneLocalTime < preRoll ? (preRoll - sceneLocalTime) / rate : 0;
     this.activeSourceNode = source;
+    if (this.activeSources) this.activeSources.add(source);
     this.audioPlaybackState = { active: true, loading: false, loadingSince: 0 };
     this.audioSync = {
       sceneIndex,
@@ -991,6 +1204,7 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
     };
 
     source.onended = () => {
+      if (this.activeSources) this.activeSources.delete(source);
       if (this.activeSourceNode === source) {
         this.activeSourceNode = null;
       }
@@ -1044,6 +1258,17 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
 
   getCurrentSceneInfo() {
     return this.getSceneInfoAt(this.currentTime);
+  }
+
+  previewScrubTo(timeSec) {
+    if (!this.isReady) return;
+    this.stopTts();
+    this.currentTime = LectureAnimationEngine.clamp(timeSec, 0, Math.max(0.05, this.totalDuration - 0.05));
+    this.lastSpokenSceneIdx = -1;
+    this.renderFrameOnContext(this.ctx, this.canvas.width, this.canvas.height, this.currentTime);
+    if (this.onTimeUpdate) {
+      this.onTimeUpdate(this.currentTime, this.totalDuration, this.getSceneInfoAt(this.currentTime));
+    }
   }
 
   seekTo(timeSec) {
@@ -1169,9 +1394,14 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
       : LectureAnimationEngine.clamp(info.localTime - preRoll, 0, speechDur);
 
     const bounds = [0];
-    if (Array.isArray(scene?.beatDurations) && scene.beatDurations.length >= 3) {
-      const pauseSec = 0.28 / rate;
-      const rawLens = scene.beatDurations.slice(0, 3).map((d, idx) => d / rate + (idx < 2 ? pauseSec : 0));
+    if (Array.isArray(scene?.beatTimings) && scene.beatTimings.length >= 3) {
+      const b0 = Math.max(0.4, (scene.beatTimings[1]?.start ?? scene.beatTimings[0].end) / rate);
+      const b1 = Math.max(b0 + 0.4, (scene.beatTimings[2]?.start ?? scene.beatTimings[1].end) / rate);
+      bounds.push(Math.min(speechDur - 0.8, b0));
+      bounds.push(Math.min(speechDur - 0.3, b1));
+      bounds.push(speechDur);
+    } else if (Array.isArray(scene?.beatDurations) && scene.beatDurations.length >= 3) {
+      const rawLens = scene.beatDurations.slice(0, 3).map((d) => d / rate);
       const sumRaw = rawLens.reduce((a, b) => a + b, 0) || 1;
       let acc = 0;
       rawLens.forEach((l) => {
@@ -4252,9 +4482,9 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
     this.roundRect(ctx, 5, -18 + glassesY, 23, 18, 5);
     ctx.stroke();
 
-    // Артикуляция рта (синхронизирована с реальным AnalyserNode аудиопотока или слоговым ритмом)
+    // Артикуляция рта (синхронизирована с реальным AnalyserNode аудиопотока или слоговым ритмом, включая экспорт)
     ctx.fillStyle = "#0f172a";
-    if (!isPause && this.isPlaying) {
+    if (!isPause && (this.isPlaying || this.isExporting)) {
       const fallbackSyllable = Math.abs(Math.sin(t * 12.5) * Math.cos(t * 5.3));
       const amp = voiceAmp > 0.03 ? voiceAmp : fallbackSyllable;
       const mouthOpen = 2.5 + amp * 7.5;
@@ -4445,28 +4675,61 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
       barW - 44
     );
 
-    // Пословная КАРАОКЕ-подсветка только для текущего активного бита (без перегруза и обрезки!)
+    // Пословная КАРАОКЕ-подсветка только для текущего активного бита (по WordBoundary или пропорционально)
     const activeBeatIdx = beatsObj?.activeBeatIdx ?? 0;
     const activeBeatText = beatsObj?.beats?.[activeBeatIdx]?.text || scene.caption || "";
     const words = String(activeBeatText).split(/\s+/).filter(Boolean);
     const beatProgress = beatsObj
       ? LectureAnimationEngine.clamp(beatsObj.beatP ?? 0, 0, 1)
       : LectureAnimationEngine.clamp((p - 0.05) / 0.72, 0, 1);
-    const activeWordIdx = isPause ? words.length : Math.floor(beatProgress * words.length);
 
-    const fontSize = activeBeatText.length > 95 ? 18.5 : 20.5;
+    let activeWordIdx = isPause ? words.length : Math.floor(beatProgress * words.length);
+    if (!isPause && Array.isArray(scene.wordTimings) && scene.wordTimings.length > 0 && beatsObj) {
+      const rate = this.isExporting ? 1.0 : (this.audioSync?.rate || this.playbackSpeed || 1.0);
+      const speechT = (beatsObj.speechElapsed || 0) * rate;
+      const bt = Array.isArray(scene.beatTimings) ? scene.beatTimings[activeBeatIdx] : null;
+      if (bt && bt.end > bt.start) {
+        const beatWords = scene.wordTimings.filter((wt) => wt.s >= bt.start - 0.08 && wt.s <= bt.end + 0.08);
+        if (beatWords.length > 0) {
+          let matchedIdx = 0;
+          for (let wi = 0; wi < beatWords.length; wi++) {
+            if (speechT >= beatWords[wi].s) matchedIdx = wi;
+          }
+          activeWordIdx = Math.min(words.length - 1, Math.floor((matchedIdx / Math.max(1, beatWords.length)) * words.length));
+        }
+      }
+    }
+
+    if (this.onActiveCaptionChange && !this.isExporting) {
+      const emitKey = `${scene.id}:${activeBeatIdx}:${activeWordIdx}:${isPause ? 1 : 0}`;
+      if (emitKey !== this._lastCaptionEmitKey) {
+        this._lastCaptionEmitKey = emitKey;
+        this.onActiveCaptionChange({
+          sceneIndex: (scene.sceneIndex || 1) - 1,
+          beatIdx: activeBeatIdx,
+          text: activeBeatText,
+          words,
+          activeWordIdx,
+          isPause,
+          cps: scene.finalCps
+        });
+      }
+    }
+
+    const fontSize = activeBeatText.length > 125 ? 16.5 : activeBeatText.length > 92 ? 18.0 : 19.5;
+    const lineH = fontSize <= 17 ? 20.5 : 23.5;
     ctx.font = `700 ${fontSize}px 'Inter', sans-serif`;
     let curX = barX + 22;
-    let curY = capY + 56;
+    let curY = activeBeatText.length > 105 ? capY + 46 : capY + 54;
     const maxX = barX + barW - 24;
 
     words.forEach((word, wIdx) => {
       const wWidth = ctx.measureText(word + " ").width;
       if (curX + wWidth > maxX) {
         curX = barX + 22;
-        curY += 25;
+        curY += lineH;
       }
-      if (curY > capY + 94) return;
+      if (curY > capY + 96) return;
       if (wIdx < activeWordIdx) {
         ctx.fillStyle = theme.ink;
       } else if (wIdx === activeWordIdx) {
@@ -4594,7 +4857,7 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
         let exportAudioCtx = null;
         let audioStartAnchor = 0;
         const audioSources = [];
-        if (ctx && typeof ctx.createMediaStreamDestination === "function" && this.scenes.some((s) => s.audioBuffer)) {
+        if (this.ttsEnabled && ctx && typeof ctx.createMediaStreamDestination === "function" && this.scenes.some((s) => s.audioBuffer)) {
           try {
             const dest = ctx.createMediaStreamDestination();
             exportAudioCtx = ctx;
@@ -4664,7 +4927,7 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
         const wallStartMs = performance.now();
 
         this.renderFrameOnContext(offCtx, offCanvas.width, offCanvas.height, 0);
-        recorder.start(150);
+        recorder.start(1000);
 
         const timer = setInterval(() => {
           if (this.cancelExportFlag) {

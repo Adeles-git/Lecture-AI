@@ -863,21 +863,21 @@ window.AISupervisorPipeline = {
       return this.capitalizeFirst(res);
     };
 
-    // Делим длинные предложения по смысловым союзам, а не обрубаем на полуслове!
+    // Делим длинные предложения только по точке с запятой (не вырезая союзы «что/который», чтобы не терять подлежащее!)
     const simplifiedPoints = [];
     sentences.forEach((s) => {
       const plain = deAcademize(s);
       const words = plain.split(/\s+/).filter(Boolean);
       if (words.length <= 24) {
-        simplifiedPoints.push(this.ensureCompleteSentence(plain, 160));
+        simplifiedPoints.push(this.ensureCompleteSentence(plain, 155));
       } else {
         const subParts = plain
-          .split(/\s*(?:;|,\s+(?:что|который|которая|которое|которые|так как|поскольку|поэтому|причём|а также))\s+/i)
+          .split(/\s*;\s*/)
           .map((p) => p.trim())
           .filter((p) => p.split(/\s+/).length >= 4);
         if (subParts.length >= 2) {
           subParts.slice(0, 3).forEach((sp) => {
-            simplifiedPoints.push(this.ensureCompleteSentence(this.capitalizeFirst(sp), 145));
+            simplifiedPoints.push(this.ensureCompleteSentence(this.capitalizeFirst(sp), 150));
           });
         } else {
           simplifiedPoints.push(this.ensureCompleteSentence(plain, 155));
@@ -1472,14 +1472,14 @@ window.AISupervisorPipeline = {
     const safeGapPx = Math.max(0, captionTop - stageBottom); // 44 px чистый буфер
     const collisionAreaPx = stageBottom > captionTop ? (stageBottom - captionTop) * stageRect.w : 0;
 
-    // Проверяем каждую реплику на переполнение 2 строк полосы субтитров и CPS <= 15.0
+    // Проверяем каждую реплику на переполнение 3 строк полосы субтитров и CPS <= 15.0
     let healedBeats = 0;
     if (Array.isArray(scene.beats)) {
       scene.beats = scene.beats.map((b) => {
         const rawTxt = String(b.text || "").trim();
-        if (rawTxt.length > 106) {
+        if (rawTxt.length > 155) {
           healedBeats++;
-          return { ...b, text: this.ensureCompleteSentence(rawTxt, 102) };
+          return { ...b, text: this.ensureCompleteSentence(rawTxt, 150) };
         }
         return b;
       });
@@ -1513,20 +1513,36 @@ window.AISupervisorPipeline = {
     scene.contrastRatio = `${ratioNum}:1 (${wcagLevel})`;
     return { collisionAreaPx, safeGapPx, ratioNum, wcagLevel, healedBeats };
   },
-  ensureCompleteSentence(raw, maxChars = 142) {
+  ensureCompleteSentence(raw, maxChars = 155) {
     let s = String(raw || "").replace(/\s+/g, " ").trim();
     if (!s) return "";
+    // Если фраза не помещается, сначала аккуратно убираем длинные пояснения в скобках целиком
+    if (s.length > maxChars) {
+      const noParens = s.replace(/\s*\([^)]{8,}\)/g, "").replace(/\s+/g, " ").trim();
+      if (noParens.length >= 24) s = noParens;
+    }
     if (s.length > maxChars) {
       const cut = s.slice(0, maxChars);
       const lastPunct = Math.max(cut.lastIndexOf("."), cut.lastIndexOf("!"), cut.lastIndexOf("?"));
-      if (lastPunct > 55) {
+      if (lastPunct > 45) {
         s = cut.slice(0, lastPunct + 1).trim();
       } else {
-        const lastComma = cut.lastIndexOf(",");
-        s = (lastComma > 85 ? cut.slice(0, lastComma) : cut.replace(/\s+\S*$/, "")).replace(/[,:;—–-]+$/, "") + ".";
+        const lastClause = Math.max(cut.lastIndexOf(";"), cut.lastIndexOf(" — "), cut.lastIndexOf(","));
+        s = (lastClause > 55 ? cut.slice(0, lastClause) : cut.replace(/\s+\S*$/, "")).replace(/[,:;—–-]+$/, "").trim();
       }
     }
-    if (!/[.!?…]$/.test(s)) s += ".";
+    // Убираем висячие предлоги, союзы и обрывки в конце предложения
+    const danglingRe = /\s+(?:в|во|на|но|и|а|к|с|со|о|об|от|по|до|за|из|под|над|при|для|без|про|через|между|либо|или|как|что|чтобы|если|хотя|также|где|когда|не|ни|который|которая|которое|которые|своего|данной|такой|этого)$/i;
+    for (let k = 0; k < 3; k++) {
+      if (!danglingRe.test(s)) break;
+      s = s.replace(danglingRe, "").replace(/[,:;—–(-]+$/, "").trim();
+    }
+    // Убираем незакрытую скобку в конце
+    if ((s.match(/\(/g) || []).length > (s.match(/\)/g) || []).length) {
+      s = s.replace(/\s*\([^)]*$/, "").trim();
+    }
+    s = s.replace(/[,:;—–-]+$/, "").trim();
+    if (s && !/[.!?…]$/.test(s)) s += ".";
     return s;
   },
 
@@ -1651,17 +1667,34 @@ window.AISupervisorPipeline = {
         ].slice(0, pacing.sceneCount);
 
     const usedSentences = new Set();
+    const usedSceneTitles = new Set();
     const pickUnique = (candidates, fallback) => {
       for (const c of candidates) {
         if (!c) continue;
-        const clean = this.ensureCompleteSentence(c, 102);
+        const clean = this.ensureCompleteSentence(c, 150);
         const key = clean.toLowerCase().slice(0, 44);
         if (clean.length > 14 && !usedSentences.has(key)) {
           usedSentences.add(key);
           return clean;
         }
       }
-      return this.ensureCompleteSentence(fallback, 102);
+      const fb = this.ensureCompleteSentence(fallback, 150);
+      usedSentences.add(fb.toLowerCase().slice(0, 44));
+      return fb;
+    };
+    const pickSceneTitle = (preferred, altTitle, fallbackTerm) => {
+      const candidates = [preferred, altTitle, `${altTitle}: ${fallbackTerm}`];
+      for (const cand of candidates) {
+        const clean = this.shortLabel(String(cand || "").replace(/:$/, "").trim(), 52);
+        const low = clean.toLowerCase();
+        if (clean.length > 4 && !usedSceneTitles.has(low)) {
+          usedSceneTitles.add(low);
+          return clean;
+        }
+      }
+      const uniq = this.shortLabel(`${preferred || altTitle} (${fallbackTerm})`, 52);
+      usedSceneTitles.add(uniq.toLowerCase());
+      return uniq;
     };
 
     let selfHealedCount = 0;
@@ -1691,11 +1724,14 @@ window.AISupervisorPipeline = {
       const secBullets = Array.isArray(sec?.plainBullets) ? sec.plainBullets.filter(Boolean) : [];
       // Подбираем 3–4 реальных элемента из текущего раздела (без копипасты глоссария)
       const stageItems = [];
+      const badStageStartRe = /^(?:хотя|как\s+писал|если|когда|потому|однако|кроме|также|таким\s+образом|позволит|способствует|является)/i;
       if (secBullets.length >= 3) {
         secBullets.slice(0, 4).forEach((b, bIdx) => {
           const g = glossary[(idx + bIdx) % glossary.length];
+          const rawHead = b.split(/[:—–-]/)[0].trim();
+          const cleanHead = badStageStartRe.test(rawHead) ? "" : this.shortLabel(rawHead, 28);
           stageItems.push({
-            shortTitle: this.shortLabel(b.split(/[:—–-]/)[0].trim(), 28) || (g ? this.shortLabel(g.term.split(/[/(]/)[0].trim(), 28) : `${stepWord} ${bIdx + 1}`),
+            shortTitle: cleanHead || (g ? this.shortLabel(g.term.split(/[/(]/)[0].trim(), 28) : `${stepWord} ${bIdx + 1}`),
             detail: this.shortLabel(b, 68),
             metric: secMetrics[bIdx] || `${stepWord} 0${bIdx + 1}`
           });
@@ -1777,26 +1813,26 @@ window.AISupervisorPipeline = {
         }
       } else if (idx === 0) {
         tutorCue = "WARNING_PALM";
-        sceneTitle = this.shortLabel(sec?.title || shortCourse, 52);
+        sceneTitle = pickSceneTitle(sec?.title || shortCourse, meta.title, shortTerm);
         b0 = pickUnique(
           [secSents[0], `В теме «${this.shortLabel(shortCourse, 46)}» ключевую роль играет «${shortTerm}».`],
           `Тема урока — «${this.shortLabel(shortCourse, 52)}».`
         );
         b1 = pickUnique(
           [secSents[1], secBullets[0], `«${shortTerm}» — это ${plainDef}.`],
-          `Ключевой термин — «${shortTerm}»: ${plainDef}.`
+          `Ключевой термин «${shortTerm}» означает: ${plainDef}.`
         );
         b2 = pickUnique(
-          [secSents[2], secBullets[1], `${stageItems[0]?.detail || plainDef}.`],
-          `Посмотрим на схеме, как этот механизм работает на практике.`
+          [secSents[2], secBullets[1], `На схеме показано, как «${shortTerm}» работает на практике.`],
+          `Посмотрим на схеме, как этот принцип работает на практике.`
         );
       } else if (isClosing) {
         tutorCue = "THUMBS_UP";
         emotion = "celebrate";
-        sceneTitle = meta.title;
+        sceneTitle = pickSceneTitle(meta.title, "Итоги темы", shortTerm);
         const allTermNames = glossary.slice(0, 5).map((g) => g.term.split(/[/(]/)[0].trim()).join(", ");
         b0 = pickUnique(
-          [secSents[0], `Соберём ключевые понятия урока «${this.shortLabel(shortCourse, 38)}»: ${allTermNames}.`],
+          [`Соберём ключевые понятия урока «${this.shortLabel(shortCourse, 38)}»: ${allTermNames}.`, secSents[0]],
           `Соберём все ключевые понятия урока в единую карту.`
         );
         b1 = pickUnique(
@@ -1804,32 +1840,32 @@ window.AISupervisorPipeline = {
           `Все изученные термины работают как единая система знаний.`
         );
         b2 = pickUnique(
-          [secBullets[1], `Закрепите материал в конспекте, интеллект-карте и мини-тесте ниже.`],
+          [`Закрепите материал в конспекте, интеллект-карте и мини-тесте ниже.`],
           `Проверьте себя в мини-тесте ниже — материал готов к повторению.`
         );
       } else if (modId === "split_versus_duel" || modId === "scales_balance_norm") {
         tutorCue = "QUESTION_OPEN";
         emotion = "risk";
-        sceneTitle = sec?.title ? this.shortLabel(sec.title, 54) : meta.title;
+        sceneTitle = pickSceneTitle(sec?.title, meta.title, shortTerm);
         b0 = pickUnique(
           [secSents[0], signals.contrastQuote, secBullets[0]],
           `Без системного разбора «${shortTerm}» возникают ошибки.`
         );
         b1 = pickUnique(
-          [secSents[1], secBullets[1], `Опора на «${shortTerm}» (${this.shortLabel(plainDef, 56)}) даёт точный результат.`],
+          [secSents[1], secBullets[1], `Опора на «${shortTerm}» даёт точный и обоснованный результат.`],
           `Научный подход через «${shortTerm}» раскрывает механизм явления.`
         );
         b2 = pickUnique(
-          [secSents[2], secBullets[2], `Разница видна сразу: ${signals.deltaBadge}.`],
+          [secSents[2], secBullets[2], `Разница подходов видна сразу: ${signals.deltaBadge}.`],
           `Системный метод даёт точный и проверенный результат.`
         );
       } else if (modId === "cause_effect_flow" || modId === "worked_example") {
-        sceneTitle = sec?.title ? this.shortLabel(sec.title, 54) : meta.title;
-        b0 = pickUnique([secSents[0], secBullets[0], `Исходное условие: «${stepLbl}» — ${stageItems[0]?.detail || plainDef}.`], `Исходный фактор — «${stepLbl}».`);
-        b1 = pickUnique([secSents[1], secBullets[1], `Через «${shortTerm}» (${stepLbl2}) условие преобразуется в действие.`], `Механизм «${shortTerm}» запускает изменение.`);
-        b2 = pickUnique([secSents[2], secBullets[2], `Практический результат — «${stepLbl3}».`], `Итог процесса виден в «${stepLbl3}».`);
+        sceneTitle = pickSceneTitle(sec?.title, meta.title, shortTerm);
+        b0 = pickUnique([secSents[0], secBullets[0], `Исходное условие: ${stageItems[0]?.detail || plainDef}.`], `Исходный фактор — «${stepLbl}».`);
+        b1 = pickUnique([secSents[1], secBullets[1], `Через «${shortTerm}» это условие преобразуется в действие.`], `Механизм «${shortTerm}» запускает изменение.`);
+        b2 = pickUnique([secSents[2], secBullets[2], `Практический результат проявляется через «${stepLbl3}».`], `Итог процесса виден в «${stepLbl3}».`);
       } else if (modId === "multi_mode_chart" || modId === "causal_curve") {
-        sceneTitle = sec?.title ? this.shortLabel(sec.title, 54) : meta.title;
+        sceneTitle = pickSceneTitle(sec?.title, meta.title, shortTerm);
         b0 = pickUnique([secSents[0], secBullets[0], `Проследим зависимость между «${shortTerm}» и параметром «${stepLbl}».`], `Разберём главную зависимость факторов раздела.`);
         b1 = pickUnique(
           [secSents[1], signals.hasFormula ? `Соотношение задаётся правилом ${signals.formulaCard.expression}.` : secBullets[1]],
@@ -1837,12 +1873,12 @@ window.AISupervisorPipeline = {
         );
         b2 = pickUnique([secSents[2], secBullets[2], `Вывод: ${plainDef}.`], `Эта закономерность позволяет точно прогнозировать итог.`);
       } else if (modId === "chronicle_timeline" || modId === "timeline_scroll") {
-        sceneTitle = sec?.title ? this.shortLabel(sec.title, 54) : meta.title;
+        sceneTitle = pickSceneTitle(sec?.title, meta.title, shortTerm);
         b0 = pickUnique([secSents[0], secBullets[0], `На первом этапе раздела формируется «${stepLbl}».`], `Начальный этап — «${stepLbl}».`);
         b1 = pickUnique([secSents[1], secBullets[1], `Далее ключевую роль берёт «${shortTerm}» — ${plainDef}.`], `Следующий этап опирается на «${shortTerm}».`);
         b2 = pickUnique([secSents[2], secBullets[2], `Завершает цепочку «${stepLbl3}».`], `Этапы складываются в последовательную логику.`);
       } else {
-        sceneTitle = sec?.title ? this.shortLabel(sec.title, 54) : meta.title;
+        sceneTitle = pickSceneTitle(sec?.title, meta.title, shortTerm);
         b0 = pickUnique(
           [secSents[0], secBullets[0], `В фокусе раздела — «${stepLbl}»: ${stageItems[0]?.detail || plainDef}.`],
           `Ключевой элемент раздела — «${stepLbl}».`
@@ -1852,7 +1888,7 @@ window.AISupervisorPipeline = {
           `Далее включается «${stepLbl2}», уточняя механизм.`
         );
         b2 = pickUnique(
-          [secSents[2], secBullets[2], `Итоговый эффект обеспечивает «${stepLbl3}»: ${stageItems[2]?.detail || plainDef}.`],
+          [secSents[2], secBullets[2], `Вместе эти элементы формируют устойчивый практический результат.`],
           `Вместе эти элементы дают устойчивый результат.`
         );
       }
@@ -2092,7 +2128,7 @@ export const LectureComposition: React.FC = () => (
   },
 
   async computeContentHash(courseTitle, glossaryText, lectureText, outputLang = "ru") {
-    const raw = `v10_director||${outputLang}||${courseTitle.trim()}||${glossaryText.trim()}||${lectureText.trim()}`;
+    const raw = `v11_coherent||${outputLang}||${courseTitle.trim()}||${glossaryText.trim()}||${lectureText.trim()}`;
     if (window.crypto && window.crypto.subtle) {
       const buf = new TextEncoder().encode(raw);
       const digest = await window.crypto.subtle.digest("SHA-256", buf);
@@ -2605,6 +2641,8 @@ ${segmented.coreText.slice(0, 9000)}`
       contentHash,
       sourceLang,
       outputLang,
+      rawLectureText: cleanText,
+      rawGlossaryText: glossaryText || "",
       courseTitle: finalTitle,
       domainId: storyboardOut.domainId,
       domainName: storyboardOut.domainName,
