@@ -57,7 +57,7 @@ TTS_CACHE = OrderedDict()
 TTS_CACHE_MAX = 256
 TTS_DISK_MAX = 400
 TTS_INFLIGHT = {}
-TTS_SEMAPHORE = threading.Semaphore(2)
+TTS_SEMAPHORE = threading.Semaphore(1)
 TTS_CIRCUIT_OPEN_UNTIL = 0.0
 TTS_CONSECUTIVE_FAILS = 0
 
@@ -311,7 +311,7 @@ def _ensure_tts_loop():
 
 
 async def _edge_tts_async(text, voice, rate="+0%", pitch="+0Hz", volume="+0%", boundary="WordBoundary"):
-    connector = aiohttp.TCPConnector(ssl=SSL_CONTEXT, family=socket.AF_INET, limit=8) if aiohttp is not None else None
+    connector = aiohttp.TCPConnector(ssl=SSL_CONTEXT, family=socket.AF_INET, force_close=True) if aiohttp is not None else None
     try:
         communicate = edge_tts.Communicate(
             text,
@@ -321,8 +321,8 @@ async def _edge_tts_async(text, voice, rate="+0%", pitch="+0Hz", volume="+0%", b
             volume=volume,
             boundary=boundary,
             connector=connector,
-            connect_timeout=4,
-            receive_timeout=13,
+            connect_timeout=8,
+            receive_timeout=20,
         )
         buf = bytearray()
         word_timings = []
@@ -548,39 +548,38 @@ def synthesize_tts_cached(text, voice, rate="+0%", pitch="+0Hz", volume="+0%", l
 
             edge_allowed = edge_tts is not None and time.time() >= TTS_CIRCUIT_OPEN_UNTIL
             if edge_allowed:
-                for attempt in range(2):
+                is_male_voice = any(m in voice for m in ("Dmitry", "Daulet", "Andrew"))
+                fallback_neural = "en-US-AndrewMultilingualNeural" if is_male_voice else "en-US-AvaMultilingualNeural"
+                retry_delays = (0.35, 0.7, 1.2, 1.8, 2.5, 0.0)
+                for attempt in range(6):
+                    cur_voice = voice if attempt < 5 else fallback_neural
                     try:
-                        send_txt = cur_text if attempt == 0 else re.sub(r"[^0-9A-Za-zА-Яа-яЁёӘәІіҢңҒғҮүҰұҚқӨөҺһ.,;:!?…\s-]", " ", cur_text)
+                        send_txt = cur_text if attempt % 2 == 0 else re.sub(r"[^0-9A-Za-zА-Яа-яЁёӘәІіҢңҒғҮүҰұҚқӨөҺһ.,;:!?…\s-]", " ", cur_text)
                         send_txt = re.sub(r"\s+", " ", send_txt).strip()
-                        if attempt == 1 and not send_txt.endswith((".", "!", "?")):
+                        if attempt % 2 == 1 and not send_txt.endswith((".", "!", "?")):
                             send_txt += "."
-                        use_boundary = "SentenceBoundary" if attempt == 1 else "WordBoundary"
-                        audio_bytes, word_timings = _run_edge_tts_sync(send_txt, voice, rate, pitch, volume, timeout=14, boundary=use_boundary)
+                        use_boundary = "SentenceBoundary" if attempt >= 3 else "WordBoundary"
+                        audio_bytes, word_timings = _run_edge_tts_sync(send_txt, cur_voice, rate, pitch, volume, timeout=18, boundary=use_boundary)
                         if audio_bytes:
                             TTS_CONSECUTIVE_FAILS = 0
                             provider = "edge"
+                            time.sleep(0.25)
                             break
                         last_err = "Empty Edge TTS audio stream"
                     except Exception as err:
                         last_err = str(err) or type(err).__name__
-                        print(f"[Edge TTS retry {attempt + 1}] voice={voice} err={last_err}")
-                        if attempt == 0:
-                            time.sleep(0.2)
+                        print(f"[Edge TTS retry {attempt + 1}/6] voice={cur_voice} err={last_err}")
+                        delay = retry_delays[attempt]
+                        if delay > 0:
+                            time.sleep(delay)
 
-            if not audio_bytes:
-                if edge_allowed:
-                    TTS_CONSECUTIVE_FAILS += 1
-                    if TTS_CONSECUTIVE_FAILS >= 12:
-                        TTS_CIRCUIT_OPEN_UNTIL = time.time() + 10.0
-                # Резервный облачный MP3-канал (НЕ кэшируется на диск, чтобы не застревал робот-голос)
-                try:
-                    audio_bytes, word_timings = _cloud_mp3_tts_fallback(cur_text, lang)
-                    provider = "cloud_fallback"
-                except Exception as fb_err:
-                    last_err = f"{last_err or 'Edge unavailable'}; fallback: {fb_err}"
+            if not audio_bytes and edge_allowed:
+                TTS_CONSECUTIVE_FAILS += 1
+                if TTS_CONSECUTIVE_FAILS >= 12:
+                    TTS_CIRCUIT_OPEN_UNTIL = time.time() + 10.0
 
         if not audio_bytes:
-            raise RuntimeError(last_err or "All TTS providers failed")
+            raise RuntimeError(last_err or "Edge Neural TTS unavailable")
 
         with TTS_CACHE_LOCK:
             entry_val = {"audio": audio_bytes, "words": word_timings, "provider": provider}
@@ -734,6 +733,52 @@ def parse_multipart(content_type, body):
         payload = part.get_payload(decode=True) or b""
         parts.append({"filename": fn, "data": payload})
     return parts
+
+
+def clean_extracted_document_text(text):
+    t = str(text or "")
+    t = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", " ", t)
+    t = re.sub(r'\bHYPERLINK\s+"[^"]*"(?:\s+\\[a-z]\s+"[^"]*")?\s*', "", t, flags=re.IGNORECASE)
+    t = re.sub(r"\b(?:PAGEREF|TOC|SEQ|REF|STYLEREF|EMBED|INCLUDEPICTURE|SHAPE)\s+[^\n\r]{1,80}", " ", t, flags=re.IGNORECASE)
+    t = re.sub(r"\b(?:HYPERLINK|MERGEFORMAT|FORMTEXT|themeManager\S*|schemas\.openxmlformats\S*|SelectedStyle|ds:datastoreItem\S*)\b", " ", t, flags=re.IGNORECASE)
+    t = re.sub(r"^\s*PAGE(?:\s+\d+)?\s*$", "", t, flags=re.IGNORECASE | re.MULTILINE)
+    t = re.sub(r"[ \t]{2,}", " ", t)
+    return re.sub(r"\n{3,}", "\n\n", t).strip()
+
+
+def extract_text_from_doc_bytes(data_bytes):
+    """Кроссплатформенный fallback-парсер бинарных .doc (UTF-16LE и CP1251) без зависимости от macOS textutil."""
+    chunks = []
+    # 1. Поиск текстовых блоков в UTF-16LE (основная кодировка современных .doc)
+    try:
+        u16 = data_bytes.decode("utf-16-le", errors="ignore")
+        for m in re.finditer(r"[А-Яа-яЁёӘәІіҢңҒғҮүҰұҚқӨөҺһA-Za-z0-9][А-Яа-яЁёӘәІіҢңҒғҮүҰұҚқӨөҺһA-Za-z0-9\s.,:;!?()«»\"'–—-]{18,}", u16):
+            s = m.group(0).strip()
+            if re.search(r"[А-Яа-яЁёӘәІіҢңҒғҮүҰұҚқӨөҺһ]{3,}", s) and not re.search(r"(?:Root Entry|WordDocument|SummaryInformation|Microsoft Word|Times New Roman|Calibri|Cambria|Normal\.dotm)", s, re.IGNORECASE):
+                chunks.append(s)
+    except Exception:
+        pass
+
+    # 2. Если UTF-16LE дал мало текста, пробуем CP1251
+    if sum(len(c) for c in chunks) < 120:
+        try:
+            cp = data_bytes.decode("cp1251", errors="ignore")
+            for m in re.finditer(r"[А-Яа-яЁё][А-Яа-яЁёA-Za-z0-9\s.,:;!?()«»\"'–—-]{22,}", cp):
+                s = m.group(0).strip()
+                if len(re.findall(r"[А-Яа-яЁё]", s)) >= 12:
+                    chunks.append(s)
+        except Exception:
+            pass
+
+    dedup = []
+    seen = set()
+    for ch in chunks:
+        norm = re.sub(r"\s+", " ", ch).strip()
+        key = norm[:60].lower()
+        if len(norm) > 20 and key not in seen:
+            seen.add(key)
+            dedup.append(norm)
+    return clean_extracted_document_text("\n".join(dedup))[:24000]
 
 
 def extract_text_from_docx_bytes(data_bytes):
@@ -1190,6 +1235,8 @@ class LectureAIHandler(http.server.SimpleHTTPRequestHandler):
                                 if proc.returncode == 0 and proc.stdout:
                                     text = proc.stdout.decode("utf-8", errors="ignore").strip()
                             if not text:
+                                text = extract_text_from_doc_bytes(data)
+                            if not text:
                                 warnings.append(f"Не удалось прочитать старый формат «{p['filename']}» — попробуйте пересохранить в .docx.")
                         except Exception as doc_err:
                             warnings.append(f"Ошибка чтения .doc «{p['filename']}»: {doc_err}")
@@ -1223,7 +1270,9 @@ class LectureAIHandler(http.server.SimpleHTTPRequestHandler):
                 except Exception as e:
                     warnings.append(str(e))
                 if text:
-                    extracted_list.append(text)
+                    cleaned_doc = clean_extracted_document_text(text)
+                    if cleaned_doc:
+                        extracted_list.append(cleaned_doc)
 
             self.send_json(200, {"text": "\n\n".join(extracted_list).strip(), "warnings": warnings})
             return
@@ -1372,6 +1421,7 @@ class LectureAIHandler(http.server.SimpleHTTPRequestHandler):
 
 if __name__ == "__main__":
     init_db()
+    _purge_fallback_disk_cache()
     http.server.ThreadingHTTPServer.allow_reuse_address = True
     http.server.ThreadingHTTPServer.daemon_threads = True
     with http.server.ThreadingHTTPServer(("", PORT), LectureAIHandler) as httpd:

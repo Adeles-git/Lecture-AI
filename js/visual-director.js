@@ -5,206 +5,206 @@ window.LectureVisualDirector = (function () {
   const EDITORIAL_THEMES = {
     arch_eng: {
       domainId: "arch_eng",
-      name: "Drafting Porcelain & Cobalt",
+      name: "Minimalist Deep Navy · Engineering",
       label: "Инженерия, строительство и физика",
       patternType: "blueprint",
       glyph: "structure",
-      bgTop: "#FAF9F5",
-      bgBottom: "#EEF3F9",
-      ambientA: "rgba(191, 219, 254, 0.42)",
-      ambientB: "rgba(254, 243, 199, 0.30)",
-      gridColor: "rgba(100, 116, 139, 0.13)",
-      surfaceTop: "rgba(255, 255, 255, 0.92)",
-      surfaceBottom: "rgba(248, 250, 252, 0.94)",
-      surfaceBorder: "rgba(15, 23, 42, 0.09)",
-      shadowRgb: "29, 78, 216",
-      ink: "#18181B",
-      muted: "#52525B",
-      primary: "#1D4ED8",
-      primaryLight: "#3B82F6",
-      primarySoft: "rgba(29, 78, 216, 0.10)",
-      secondary: "#EA580C",
-      secondaryLight: "#FB923C",
-      secondarySoft: "rgba(234, 88, 12, 0.10)",
-      success: "#0F766E",
-      successSoft: "rgba(15, 118, 110, 0.10)",
-      danger: "#DC2626",
-      dangerSoft: "rgba(220, 38, 38, 0.09)",
+      bgTop: "#F7F9FC",
+      bgBottom: "#EDF2FA",
+      ambientA: "rgba(30, 58, 138, 0.10)",
+      ambientB: "rgba(15, 23, 42, 0.06)",
+      gridColor: "rgba(15, 23, 42, 0.07)",
+      surfaceTop: "rgba(255, 255, 255, 0.96)",
+      surfaceBottom: "rgba(248, 250, 252, 0.98)",
+      surfaceBorder: "rgba(30, 58, 138, 0.15)",
+      shadowRgb: "30, 58, 138",
+      ink: "#0F172A",
+      muted: "#475569",
+      primary: "#1E3A8A",
+      primaryLight: "#2563EB",
+      primarySoft: "rgba(30, 58, 138, 0.10)",
+      secondary: "#1D4ED8",
+      secondaryLight: "#3B82F6",
+      secondarySoft: "rgba(29, 78, 216, 0.10)",
+      success: "#1E3A8A",
+      successSoft: "rgba(30, 58, 138, 0.10)",
+      danger: "#BE123C",
+      dangerSoft: "rgba(190, 18, 60, 0.09)",
       cardPalettes: [
-        { top: "#EFF6FF", bot: "#DBEAFE", stroke: "#2563EB", text: "#1E3A8A" },
-        { top: "#FFF7ED", bot: "#FFEDD5", stroke: "#EA580C", text: "#9A3412" },
-        { top: "#F0FDF4", bot: "#DCFCE7", stroke: "#0D9488", text: "#115E59" },
-        { top: "#F8FAFC", bot: "#E2E8F0", stroke: "#475569", text: "#1E293B" }
+        { top: "#EFF4FF", bot: "#DBEAFE", stroke: "#1E3A8A", text: "#0F172A" },
+        { top: "#F1F5FB", bot: "#E2E8F0", stroke: "#0F2942", text: "#0F172A" },
+        { top: "#F8FAFC", bot: "#EFF6FF", stroke: "#1D4ED8", text: "#1E3A8A" },
+        { top: "#FFFFFF", bot: "#F1F5FB", stroke: "#334155", text: "#0F172A" }
       ]
     },
     ai_cs: {
       domainId: "ai_cs",
-      name: "Stripe Editorial & Prism Mist",
+      name: "Minimalist Deep Navy · Tech & AI",
       label: "IT, алгоритмы и ИИ",
       patternType: "dots",
       glyph: "circuit",
-      bgTop: "#F9FAFB",
-      bgBottom: "#F0F2FA",
-      ambientA: "rgba(221, 214, 254, 0.45)",
-      ambientB: "rgba(207, 250, 254, 0.38)",
-      gridColor: "rgba(99, 102, 241, 0.11)",
-      surfaceTop: "rgba(255, 255, 255, 0.92)",
-      surfaceBottom: "rgba(248, 250, 252, 0.94)",
-      surfaceBorder: "rgba(79, 70, 229, 0.11)",
-      shadowRgb: "79, 70, 229",
+      bgTop: "#F7F9FC",
+      bgBottom: "#EDF2FA",
+      ambientA: "rgba(30, 58, 138, 0.10)",
+      ambientB: "rgba(29, 78, 216, 0.07)",
+      gridColor: "rgba(30, 58, 138, 0.07)",
+      surfaceTop: "rgba(255, 255, 255, 0.96)",
+      surfaceBottom: "rgba(248, 250, 252, 0.98)",
+      surfaceBorder: "rgba(30, 58, 138, 0.15)",
+      shadowRgb: "30, 58, 138",
       ink: "#0F172A",
       muted: "#475569",
-      primary: "#4F46E5",
-      primaryLight: "#6366F1",
-      primarySoft: "rgba(79, 70, 229, 0.10)",
-      secondary: "#0891B2",
-      secondaryLight: "#22D3EE",
-      secondarySoft: "rgba(8, 145, 178, 0.10)",
-      success: "#059669",
-      successSoft: "rgba(5, 150, 105, 0.10)",
-      danger: "#E11D48",
-      dangerSoft: "rgba(225, 29, 72, 0.09)",
+      primary: "#1E3A8A",
+      primaryLight: "#2563EB",
+      primarySoft: "rgba(30, 58, 138, 0.10)",
+      secondary: "#1D4ED8",
+      secondaryLight: "#3B82F6",
+      secondarySoft: "rgba(29, 78, 216, 0.10)",
+      success: "#1E3A8A",
+      successSoft: "rgba(30, 58, 138, 0.10)",
+      danger: "#BE123C",
+      dangerSoft: "rgba(190, 18, 60, 0.09)",
       cardPalettes: [
-        { top: "#EEF2FF", bot: "#E0E7FF", stroke: "#4F46E5", text: "#312E81" },
-        { top: "#ECFEFF", bot: "#CFFAFE", stroke: "#0891B2", text: "#164E63" },
-        { top: "#FAF5FF", bot: "#F3E8FF", stroke: "#7C3AED", text: "#581C87" },
-        { top: "#ECFDF5", bot: "#D1FAE5", stroke: "#059669", text: "#064E3B" }
+        { top: "#EFF4FF", bot: "#DBEAFE", stroke: "#1E3A8A", text: "#0F172A" },
+        { top: "#F1F5FB", bot: "#E2E8F0", stroke: "#0F2942", text: "#0F172A" },
+        { top: "#F8FAFC", bot: "#EFF6FF", stroke: "#1D4ED8", text: "#1E3A8A" },
+        { top: "#FFFFFF", bot: "#F1F5FB", stroke: "#334155", text: "#0F172A" }
       ]
     },
     bio_med: {
       domainId: "bio_med",
-      name: "Botanical Sage & Clinical Pearl",
+      name: "Minimalist Deep Navy · Bio & Med",
       label: "Медицина, биология и экология",
       patternType: "organic",
       glyph: "cell",
-      bgTop: "#F8FAF8",
-      bgBottom: "#EAF4EE",
-      ambientA: "rgba(167, 243, 208, 0.42)",
-      ambientB: "rgba(255, 228, 230, 0.32)",
-      gridColor: "rgba(13, 148, 136, 0.10)",
-      surfaceTop: "rgba(255, 255, 255, 0.92)",
-      surfaceBottom: "rgba(247, 252, 250, 0.94)",
-      surfaceBorder: "rgba(13, 148, 136, 0.12)",
-      shadowRgb: "13, 148, 136",
-      ink: "#132A23",
-      muted: "#4B685E",
-      primary: "#0D9488",
-      primaryLight: "#14B8A6",
-      primarySoft: "rgba(13, 148, 136, 0.10)",
-      secondary: "#E11D48",
-      secondaryLight: "#FB7185",
-      secondarySoft: "rgba(225, 29, 72, 0.09)",
-      success: "#059669",
-      successSoft: "rgba(5, 150, 105, 0.10)",
-      danger: "#DC2626",
-      dangerSoft: "rgba(220, 38, 38, 0.09)",
+      bgTop: "#F7F9FC",
+      bgBottom: "#EDF2FA",
+      ambientA: "rgba(30, 58, 138, 0.10)",
+      ambientB: "rgba(15, 23, 42, 0.06)",
+      gridColor: "rgba(30, 58, 138, 0.07)",
+      surfaceTop: "rgba(255, 255, 255, 0.96)",
+      surfaceBottom: "rgba(248, 250, 252, 0.98)",
+      surfaceBorder: "rgba(30, 58, 138, 0.15)",
+      shadowRgb: "30, 58, 138",
+      ink: "#0F172A",
+      muted: "#475569",
+      primary: "#1E3A8A",
+      primaryLight: "#2563EB",
+      primarySoft: "rgba(30, 58, 138, 0.10)",
+      secondary: "#1D4ED8",
+      secondaryLight: "#3B82F6",
+      secondarySoft: "rgba(29, 78, 216, 0.10)",
+      success: "#1E3A8A",
+      successSoft: "rgba(30, 58, 138, 0.10)",
+      danger: "#BE123C",
+      dangerSoft: "rgba(190, 18, 60, 0.09)",
       cardPalettes: [
-        { top: "#F0FDFA", bot: "#CCFBF1", stroke: "#0D9488", text: "#134E4A" },
-        { top: "#FFF1F2", bot: "#FFE4E6", stroke: "#E11D48", text: "#881337" },
-        { top: "#ECFDF5", bot: "#D1FAE5", stroke: "#059669", text: "#065F46" },
-        { top: "#F0F9FF", bot: "#E0F2FE", stroke: "#0284C7", text: "#075985" }
+        { top: "#EFF4FF", bot: "#DBEAFE", stroke: "#1E3A8A", text: "#0F172A" },
+        { top: "#F1F5FB", bot: "#E2E8F0", stroke: "#0F2942", text: "#0F172A" },
+        { top: "#F8FAFC", bot: "#EFF6FF", stroke: "#1D4ED8", text: "#1E3A8A" },
+        { top: "#FFFFFF", bot: "#F1F5FB", stroke: "#334155", text: "#0F172A" }
       ]
     },
     biz_econ: {
       domainId: "biz_econ",
-      name: "FT Paper & Emerald Brass",
+      name: "Minimalist Deep Navy · Economics",
       label: "Экономика, финансы и менеджмент",
       patternType: "ledger",
       glyph: "trend",
-      bgTop: "#FBF7F2",
-      bgBottom: "#F3ECE1",
-      ambientA: "rgba(253, 230, 138, 0.30)",
-      ambientB: "rgba(209, 250, 229, 0.34)",
-      gridColor: "rgba(120, 113, 108, 0.13)",
-      surfaceTop: "rgba(255, 253, 249, 0.93)",
-      surfaceBottom: "rgba(250, 246, 240, 0.95)",
-      surfaceBorder: "rgba(120, 113, 108, 0.13)",
-      shadowRgb: "15, 118, 110",
-      ink: "#1C1917",
-      muted: "#6B635B",
-      primary: "#0F766E",
-      primaryLight: "#14B8A6",
-      primarySoft: "rgba(15, 118, 110, 0.10)",
-      secondary: "#B45309",
-      secondaryLight: "#D97706",
-      secondarySoft: "rgba(180, 83, 9, 0.10)",
-      success: "#15803D",
-      successSoft: "rgba(21, 128, 61, 0.10)",
-      danger: "#B91C1C",
-      dangerSoft: "rgba(185, 28, 28, 0.09)",
+      bgTop: "#F7F9FC",
+      bgBottom: "#EDF2FA",
+      ambientA: "rgba(30, 58, 138, 0.10)",
+      ambientB: "rgba(15, 23, 42, 0.06)",
+      gridColor: "rgba(15, 23, 42, 0.07)",
+      surfaceTop: "rgba(255, 255, 255, 0.96)",
+      surfaceBottom: "rgba(248, 250, 252, 0.98)",
+      surfaceBorder: "rgba(30, 58, 138, 0.15)",
+      shadowRgb: "30, 58, 138",
+      ink: "#0F172A",
+      muted: "#475569",
+      primary: "#1E3A8A",
+      primaryLight: "#2563EB",
+      primarySoft: "rgba(30, 58, 138, 0.10)",
+      secondary: "#1D4ED8",
+      secondaryLight: "#3B82F6",
+      secondarySoft: "rgba(29, 78, 216, 0.10)",
+      success: "#1E3A8A",
+      successSoft: "rgba(30, 58, 138, 0.10)",
+      danger: "#BE123C",
+      dangerSoft: "rgba(190, 18, 60, 0.09)",
       cardPalettes: [
-        { top: "#ECFDF5", bot: "#D1FAE5", stroke: "#0F766E", text: "#115E59" },
-        { top: "#FFFBEB", bot: "#FEF3C7", stroke: "#B45309", text: "#78350F" },
-        { top: "#F0F9FF", bot: "#E0F2FE", stroke: "#0369A1", text: "#0C4A6E" },
-        { top: "#FAF5FF", bot: "#F3E8FF", stroke: "#7E22CE", text: "#581C87" }
+        { top: "#EFF4FF", bot: "#DBEAFE", stroke: "#1E3A8A", text: "#0F172A" },
+        { top: "#F1F5FB", bot: "#E2E8F0", stroke: "#0F2942", text: "#0F172A" },
+        { top: "#F8FAFC", bot: "#EFF6FF", stroke: "#1D4ED8", text: "#1E3A8A" },
+        { top: "#FFFFFF", bot: "#F1F5FB", stroke: "#334155", text: "#0F172A" }
       ]
     },
     soc_hum: {
       domainId: "soc_hum",
-      name: "Editorial Terracotta & Warm Sand",
+      name: "Minimalist Deep Navy · Humanities",
       label: "Социология, история и гуманитарные науки",
       patternType: "editorial",
       glyph: "people",
-      bgTop: "#FAF7F2",
-      bgBottom: "#F2EBE1",
-      ambientA: "rgba(254, 215, 170, 0.38)",
-      ambientB: "rgba(224, 231, 255, 0.32)",
-      gridColor: "rgba(120, 113, 108, 0.11)",
-      surfaceTop: "rgba(255, 254, 251, 0.93)",
-      surfaceBottom: "rgba(250, 245, 238, 0.95)",
-      surfaceBorder: "rgba(194, 65, 12, 0.12)",
-      shadowRgb: "194, 65, 12",
-      ink: "#1C1917",
-      muted: "#57534E",
-      primary: "#C2410C",
-      primaryLight: "#EA580C",
-      primarySoft: "rgba(194, 65, 12, 0.10)",
-      secondary: "#334155",
-      secondaryLight: "#475569",
-      secondarySoft: "rgba(51, 65, 85, 0.10)",
-      success: "#0F766E",
-      successSoft: "rgba(15, 118, 110, 0.10)",
-      danger: "#B91C1C",
-      dangerSoft: "rgba(185, 28, 28, 0.09)",
+      bgTop: "#F7F9FC",
+      bgBottom: "#EDF2FA",
+      ambientA: "rgba(30, 58, 138, 0.10)",
+      ambientB: "rgba(15, 23, 42, 0.06)",
+      gridColor: "rgba(15, 23, 42, 0.07)",
+      surfaceTop: "rgba(255, 255, 255, 0.96)",
+      surfaceBottom: "rgba(248, 250, 252, 0.98)",
+      surfaceBorder: "rgba(30, 58, 138, 0.15)",
+      shadowRgb: "30, 58, 138",
+      ink: "#0F172A",
+      muted: "#475569",
+      primary: "#1E3A8A",
+      primaryLight: "#2563EB",
+      primarySoft: "rgba(30, 58, 138, 0.10)",
+      secondary: "#1D4ED8",
+      secondaryLight: "#3B82F6",
+      secondarySoft: "rgba(29, 78, 216, 0.10)",
+      success: "#1E3A8A",
+      successSoft: "rgba(30, 58, 138, 0.10)",
+      danger: "#BE123C",
+      dangerSoft: "rgba(190, 18, 60, 0.09)",
       cardPalettes: [
-        { top: "#FFF7ED", bot: "#FFEDD5", stroke: "#C2410C", text: "#7C2D12" },
-        { top: "#F8FAFC", bot: "#E2E8F0", stroke: "#334155", text: "#0F172A" },
-        { top: "#FEFCE8", bot: "#FEF08A", stroke: "#A16207", text: "#713F12" },
-        { top: "#F0FDFA", bot: "#CCFBF1", stroke: "#0F766E", text: "#134E4A" }
+        { top: "#EFF4FF", bot: "#DBEAFE", stroke: "#1E3A8A", text: "#0F172A" },
+        { top: "#F1F5FB", bot: "#E2E8F0", stroke: "#0F2942", text: "#0F172A" },
+        { top: "#F8FAFC", bot: "#EFF6FF", stroke: "#1D4ED8", text: "#1E3A8A" },
+        { top: "#FFFFFF", bot: "#F1F5FB", stroke: "#334155", text: "#0F172A" }
       ]
     },
     law_gov: {
       domainId: "law_gov",
-      name: "Editorial Ivory & Burgundy",
+      name: "Minimalist Deep Navy · Law",
       label: "Право, государство и политология",
       patternType: "archival_columns",
       glyph: "scales",
-      bgTop: "#FAF8F5",
-      bgBottom: "#F3EFE9",
-      ambientA: "rgba(252, 231, 243, 0.34)",
-      ambientB: "rgba(254, 243, 199, 0.30)",
-      gridColor: "rgba(120, 113, 108, 0.12)",
-      surfaceTop: "rgba(255, 254, 251, 0.93)",
-      surfaceBottom: "rgba(249, 245, 238, 0.95)",
-      surfaceBorder: "rgba(136, 19, 55, 0.12)",
-      shadowRgb: "136, 19, 55",
-      ink: "#1C1917",
-      muted: "#57534E",
-      primary: "#881337",
-      primaryLight: "#BE123C",
-      primarySoft: "rgba(136, 19, 55, 0.09)",
-      secondary: "#B45309",
-      secondaryLight: "#D97706",
-      secondarySoft: "rgba(180, 83, 9, 0.10)",
-      success: "#0F766E",
-      successSoft: "rgba(15, 118, 110, 0.10)",
-      danger: "#B91C1C",
-      dangerSoft: "rgba(185, 28, 28, 0.09)",
+      bgTop: "#F7F9FC",
+      bgBottom: "#EDF2FA",
+      ambientA: "rgba(30, 58, 138, 0.10)",
+      ambientB: "rgba(15, 23, 42, 0.06)",
+      gridColor: "rgba(15, 23, 42, 0.07)",
+      surfaceTop: "rgba(255, 255, 255, 0.96)",
+      surfaceBottom: "rgba(248, 250, 252, 0.98)",
+      surfaceBorder: "rgba(30, 58, 138, 0.15)",
+      shadowRgb: "30, 58, 138",
+      ink: "#0F172A",
+      muted: "#475569",
+      primary: "#1E3A8A",
+      primaryLight: "#2563EB",
+      primarySoft: "rgba(30, 58, 138, 0.10)",
+      secondary: "#1D4ED8",
+      secondaryLight: "#3B82F6",
+      secondarySoft: "rgba(29, 78, 216, 0.10)",
+      success: "#1E3A8A",
+      successSoft: "rgba(30, 58, 138, 0.10)",
+      danger: "#BE123C",
+      dangerSoft: "rgba(190, 18, 60, 0.09)",
       cardPalettes: [
-        { top: "#FFF1F2", bot: "#FFE4E6", stroke: "#9F1239", text: "#881337" },
-        { top: "#FFFBEB", bot: "#FEF3C7", stroke: "#B45309", text: "#78350F" },
-        { top: "#EFF6FF", bot: "#DBEAFE", stroke: "#1D4ED8", text: "#1E3A8A" },
-        { top: "#F0FDFA", bot: "#CCFBF1", stroke: "#0F766E", text: "#134E4A" }
+        { top: "#EFF4FF", bot: "#DBEAFE", stroke: "#1E3A8A", text: "#0F172A" },
+        { top: "#F1F5FB", bot: "#E2E8F0", stroke: "#0F2942", text: "#0F172A" },
+        { top: "#F8FAFC", bot: "#EFF6FF", stroke: "#1D4ED8", text: "#1E3A8A" },
+        { top: "#FFFFFF", bot: "#F1F5FB", stroke: "#334155", text: "#0F172A" }
       ]
     }
   };
@@ -289,7 +289,7 @@ window.LectureVisualDirector = (function () {
     return getTheme(bestId);
   }
 
-  function estimateComplexityAndPacing(text, glossaryLen = 4) {
+  function estimateComplexityAndPacing(text, glossaryLen = 4, sectionCount = 0) {
     const words = String(text || "").trim().split(/\s+/).filter(Boolean).length;
     const hasFormulas = /[=≈≠≥≤∑∫√]|cos\(|sin\(|log\(|O\(n/i.test(text);
     const complexityPoints =
@@ -297,13 +297,17 @@ window.LectureVisualDirector = (function () {
       (glossaryLen >= 5 ? 2 : glossaryLen >= 3 ? 1 : 0) +
       (hasFormulas ? 1 : 0);
 
+    const exactScenes = sectionCount > 0
+      ? Math.max(3, Math.min(6, sectionCount + (sectionCount >= 2 ? 1 : 0)))
+      : (complexityPoints <= 1 ? 5 : 6);
+
     if (complexityPoints <= 1) {
-      return { tier: 1, label: "Базовый обзор", sceneCount: 5, targetCps: 12.2, preRollSec: 0.7, postRollSec: 1.2 };
+      return { tier: 1, label: "Базовый обзор", sceneCount: exactScenes, targetCps: 12.2, preRollSec: 0.7, postRollSec: 1.2 };
     }
     if (complexityPoints <= 3) {
-      return { tier: 2, label: "Стандартный концептуальный", sceneCount: 6, targetCps: 12.0, preRollSec: 0.8, postRollSec: 1.4 };
+      return { tier: 2, label: "Стандартный концептуальный", sceneCount: exactScenes, targetCps: 12.0, preRollSec: 0.8, postRollSec: 1.4 };
     }
-    return { tier: 3, label: "Углублённый разбор", sceneCount: 6, targetCps: 11.5, preRollSec: 0.9, postRollSec: 1.5 };
+    return { tier: 3, label: "Углублённый разбор", sceneCount: exactScenes, targetCps: 11.5, preRollSec: 0.9, postRollSec: 1.5 };
   }
 
   function computeCalmDurationSec(caption, baseMin = 10, targetCps = 12.0, preRoll = 0.8, postRoll = 1.4) {
@@ -471,12 +475,26 @@ window.LectureVisualDirector = (function () {
     return h >>> 0;
   }
 
+  // Жёсткая доменная изоляция узкопрофильных сцен (исключает «БИОЛОГИЧЕСКИЙ ПРОЦЕСС» на лекции по праву и т.п.)
+  const DOMAIN_EXCLUSIVE_MODULES = {
+    bio_cell_cycle: new Set(["bio_med"]),
+    bio_pathway: new Set(["bio_med"]),
+    eng_structural_forces: new Set(["arch_eng"]),
+    cs_layered_pipeline: new Set(["ai_cs"]),
+    econ_funnel_waterfall: new Set(["biz_econ"])
+  };
+
   // Семантический подбор УНИКАЛЬНОЙ последовательности композиций, раскладок и переходов под конкретные разделы лекции
   function selectSectionModules(domainId, sections = [], globalSignals = {}, options = {}) {
-    const count = Math.max(4, Math.min(6, options.sceneCount || Math.max(5, Math.min(6, sections.length || 6))));
+    const secLen = Array.isArray(sections) ? sections.length : 0;
+    const defaultCount = secLen > 0 ? Math.max(3, Math.min(6, secLen + (secLen >= 2 ? 1 : 0))) : 5;
+    const count = Math.max(3, Math.min(6, options.sceneCount || defaultCount));
     const seedInt = hashSeedInt(`${domainId}||${sections.map((s) => s?.title || "").join("|")}||${options.seedStr || ""}`);
 
-    const allPool = Object.keys(MODULE_FAMILIES);
+    const allPool = Object.keys(MODULE_FAMILIES).filter((modId) => {
+      const allowed = DOMAIN_EXCLUSIVE_MODULES[modId];
+      return !allowed || allowed.has(domainId);
+    });
     const usedModules = new Set();
     let prevFamily = "";
     let prevLayout = "";
@@ -490,16 +508,34 @@ window.LectureVisualDirector = (function () {
 
     const chosen = [];
     for (let idx = 0; idx < count; idx++) {
+      const isSynthesisFinale = idx === count - 1 && (secLen >= 2 || count >= 4);
       const sec = sections[idx % Math.max(1, sections.length)] || { title: "", academicOriginal: "", plainSummary: "", plainBullets: [] };
       const feats = analyzeSectionSemantics(sec);
 
+      if (isSynthesisFinale && !usedModules.has("radial_constellation_map")) {
+        const finaleLayout = prevLayout === "wide_stage" ? "split_tutor" : "wide_stage";
+        prevLayout = finaleLayout;
+        chosen.push({
+          moduleId: "radial_constellation_map",
+          family: "network",
+          layoutMode: finaleLayout,
+          transitionType: "zoom_fade",
+          styleVariant: {
+            patternVariant: pVariants[(idx + seedInt) % pVariants.length],
+            accentMode: accentModes[(idx * 3 + (seedInt >>> 2)) % accentModes.length],
+            frameless: finaleLayout === "wide_stage",
+            paletteOffset: (idx * 2 + (seedInt >>> 4)) % 4
+          }
+        });
+        continue;
+      }
+
       const ranked = allPool
-        .filter((modId) => !usedModules.has(modId))
+        .filter((modId) => !usedModules.has(modId) && (idx < count - 1 ? modId !== "radial_constellation_map" : true))
         .map((modId) => {
           const fam = MODULE_FAMILIES[modId];
           let sc = scoreModuleForSection(modId, feats, domainId, idx, count);
           if (fam === prevFamily) sc -= 85;
-          // Детерминированный микро-сдвиг от содержания лекции, чтобы даже похожие темы имели разный визуальный ритм
           const jitter = ((seedInt + idx * 97 + modId.length * 31) % 11) * 0.9;
           return { modId, fam, sc: sc + jitter };
         })

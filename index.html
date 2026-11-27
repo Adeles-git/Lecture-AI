@@ -14,52 +14,54 @@
   <link rel="stylesheet" href="css/styles.css" />
 </head>
 <body>
-  <!-- ЧИСТАЯ ВЕРХНЯЯ ПАНЕЛЬ (Quiet Luxury) -->
+  <!-- МИНИМАЛИСТИЧНАЯ ВЕРХНЯЯ ПАНЕЛЬ (Deep Navy) -->
   <header class="topbar no-print" role="banner">
     <div class="topbar-inner">
       <div class="brand-group">
-        <button type="button" class="btn-icon-toggle" id="btnToggleSidebar" title="Скрыть или показать левую панель">
-          ☰
+        <button type="button" class="btn-icon-toggle" id="btnToggleSidebar" title="Скрыть или показать панель ввода">
+          Панель
         </button>
         <div class="brand">
           <div class="brand-logo" aria-hidden="true">L</div>
           <div>
             <div class="brand-title">Lecture AI</div>
-            <div class="brand-sub">Адаптация лекций на «ясный язык» для студентов</div>
+            <div class="brand-sub">Адаптация лекций для студентов</div>
           </div>
         </div>
       </div>
 
       <div class="topbar-controls">
-        <!-- Новая лекция (очистка с сохранением в Истории) -->
-        <button type="button" class="btn-outline" id="btnNewLecture" title="Очистить экран и начать новую лекцию (прошлая сохранится в Истории)">
-          + Новая лекция
+        <button type="button" class="btn-outline" id="btnNewLecture" title="Очистить экран и начать новую лекцию">
+          Новая лекция
         </button>
 
-        <!-- Доступность: Шрифт + Контраст -->
         <div class="a11y-group" role="group" aria-label="Размер шрифта и контраст">
           <button type="button" class="btn-chip active" id="btnFontNormal" title="Обычный шрифт">A</button>
           <button type="button" class="btn-chip" id="btnFontLarge" title="Крупный шрифт">A+</button>
           <button type="button" class="btn-chip" id="btnFontXLarge" title="Очень крупный шрифт">A++</button>
-          <button type="button" class="btn-chip" id="btnContrast" title="Высокий контраст (WCAG AAA)">◐ Контраст</button>
+          <button type="button" class="btn-chip" id="btnContrast" title="Высокий контраст">Контраст</button>
         </div>
 
-        <!-- Баланс генераций -->
-        <button type="button" class="quota-pill" id="btnOpenBilling" title="Тарифы и пополнение">
-          <span class="quota-dot"></span>
-          <span id="quotaText">Free: <strong>3</strong> ген.</span>
-          <span class="quota-cta">+100 ₸</span>
-        </button>
-
-        <button type="button" class="btn-outline" id="btnOpenMobileModal" title="Открыть на телефоне по QR-коду или ссылке">
-          📱 Телефон
-        </button>
-        <button type="button" class="btn-outline" id="btnOpenKt4Modal" title="Оценки 5+ тестировщиков (КТ 4)">
-          Отзывы (<span id="kt4CountBadge">5</span>)
-        </button>
-        <button type="button" class="btn-outline" id="btnOpenApiModal" title="Подключить ключ Gemini / Groq">
-          🔑 <span id="apiStatusBadge">ИИ</span>
-        </button>
+        <div class="dropdown-wrap">
+          <button type="button" class="btn-outline" id="btnToggleTopMenu" aria-expanded="false" aria-controls="topToolsDropdown">
+            Меню ▾
+          </button>
+          <div class="dropdown-menu hidden" id="topToolsDropdown">
+            <button type="button" class="dropdown-item" id="btnOpenPresetsModal">Примеры курсов</button>
+            <button type="button" class="dropdown-item dropdown-item-col" id="btnOpenBilling">
+              <span>Тариф и баланс</span>
+              <span class="dropdown-item-sub" id="quotaText">Free: <strong>3</strong> ген.</span>
+            </button>
+            <button type="button" class="dropdown-item" id="btnOpenMobileModal">Открыть с телефона</button>
+            <button type="button" class="dropdown-item" id="btnOpenKt4Modal">
+              Отзывы (<span id="kt4CountBadge">5</span>)
+            </button>
+            <button type="button" class="dropdown-item" id="btnOpenApiModal">
+              Настройки ИИ (<span id="apiStatusBadge">ИИ</span>)
+            </button>
+            <button type="button" class="dropdown-item hidden" id="cacheHitBadge">Отчёт проверки и код</button>
+          </div>
+        </div>
       </div>
     </div>
   </header>
@@ -68,18 +70,20 @@
   <div class="onboarding-strip no-print" id="onboardingStrip">
     <div class="onboarding-inner">
       <div class="onboarding-steps">
-        <span class="onb-step"><strong>1.</strong> Загрузите файлы преподавателя или вставьте текст</span>
+        <span class="onb-step"><span class="onb-num">1</span> Загрузите файлы или вставьте текст</span>
         <span class="onb-arrow">→</span>
-        <span class="onb-step"><strong>2.</strong> Выберите язык результата и нажмите «Создать»</span>
+        <span class="onb-step"><span class="onb-num">2</span> Выберите язык и нажмите «Создать»</span>
         <span class="onb-arrow">→</span>
-        <span class="onb-step"><strong>3.</strong> Получите 2D-мультфильм, конспект, интеллект-карту и тест</span>
+        <span class="onb-step"><span class="onb-num">3</span> Получите видео, конспект, карту и тест</span>
       </div>
       <button type="button" class="btn-close-sm" id="btnHideOnboarding" title="Скрыть подсказку">✕</button>
     </div>
   </div>
 
-  <!-- Световой Toast-алерт -->
-  <div class="flash-toast hidden no-print" id="flashToast" role="status" aria-live="assertive"></div>
+  <!-- Стек световых уведомлений (ошибки, предупреждения, статусы) -->
+  <div class="toast-stack no-print" id="toastStack" aria-live="polite">
+    <div class="flash-toast hidden" id="flashToast" role="status" aria-live="assertive"></div>
+  </div>
 
   <!-- ДВУХКОЛОНОЧНОЕ РАБОЧЕЕ ПРОСТРАНСТВО -->
   <main class="studio-workspace" id="studioWorkspace">
@@ -124,28 +128,16 @@
           <textarea id="lectureTextInput" class="form-control lecture-textarea" rows="6" placeholder="Вставьте текст лекции сюда или загрузите файл выше..."></textarea>
         </div>
 
-        <div class="sample-presets-box mt-10">
-          <div class="sample-link-row">
-            <span>Готовые вузовские курсы в 1 клик:</span>
-          </div>
-          <div class="preset-pills-row" role="group" aria-label="Готовые примеры лекций">
-            <button type="button" class="preset-pill" data-preset-key="arch">🏛️ КазГАСА</button>
-            <button type="button" class="preset-pill" data-preset-key="ai">🤖 ИИ и RAG</button>
-            <button type="button" class="preset-pill" data-preset-key="biz">📊 AlmaU Бизнес</button>
-            <button type="button" class="preset-pill" data-preset-key="kz">🇰🇿 AI-Sana ҚАЗ</button>
-          </div>
-        </div>
-
-        <!-- Словарь терминов (опционально) -->
+        <!-- Словарь терминов (необязательно) -->
         <details class="glossary-accordion mt-10">
-          <summary>📘 Словарь терминов из силлабуса (необязательно)</summary>
+          <summary>Словарь терминов (необязательно)</summary>
           <textarea id="glossaryInput" class="form-control mt-6" rows="4" placeholder="Термин — простое объяснение"></textarea>
         </details>
       </div>
 
       <!-- Панель 2: Живая речь (Live) -->
       <div class="input-panel" id="panel-live">
-        <div class="live-box">
+        <div class="live-box" id="liveBox">
           <div class="live-lang-row">
             <label for="liveLangSelect">Язык лектора (микрофон):</label>
             <select id="liveLangSelect" class="speed-select">
@@ -155,16 +147,18 @@
             </select>
           </div>
           <div class="live-actions">
-            <button type="button" class="btn-live-start" id="btnStartLive">▶ Включить микрофон</button>
+            <button type="button" class="btn-live-start" id="btnStartLive">Начать запись</button>
             <button type="button" class="btn-live-sim" id="btnSimulateLive">Демо речи</button>
+            <button type="button" class="btn-live-reset hidden" id="btnResetLive" title="Очистить текущую запись и начать с нуля">Новая запись</button>
           </div>
           <div class="vad-bar">
+            <span class="live-rec-dot" id="liveRecDot" aria-hidden="true"></span>
             <span class="vad-status" id="vadStatus">Готов</span>
             <div class="vad-meter"><div class="vad-fill" id="vadFill"></div></div>
           </div>
           <div class="vad-stats" id="vadStats">Тишина отсечена: 0 с · Исправлено: 0</div>
           <div class="live-captions-screen" id="liveCaptionsScreen" aria-live="polite">
-            <div class="live-placeholder">Нажмите «Включить микрофон» или «Демо речи»...</div>
+            <div class="live-placeholder">Нажмите «Начать запись» или «Демо речи»...</div>
           </div>
         </div>
       </div>
@@ -172,33 +166,33 @@
       <!-- Панель 3: История лекций -->
       <div class="input-panel" id="panel-history">
         <div class="history-info">
-          <strong>Кэш группы:</strong> повторная выдача лекции тратит <strong>0 токенов</strong>.
+          <strong>Сохранённые лекции:</strong> повторное открытие не тратит генерации.
         </div>
         <div class="history-list" id="historyList"></div>
       </div>
 
-      <!-- Глобальный выбор языка результата + Deaf-First опция + Главная кнопка -->
+      <!-- Глобальный выбор языка результата + опции + Главная кнопка -->
       <div class="sidebar-footer">
 
         <div class="output-lang-box">
-          <div class="output-lang-label">🌐 Язык результата (конспект, видео, тест):</div>
+          <div class="output-lang-label">Язык результата:</div>
           <div class="lang-switch" id="outputLangSwitch" role="group" aria-label="Язык результата">
             <button type="button" class="btn-lang active" data-lang="ru">РУС</button>
             <button type="button" class="btn-lang" data-lang="kk">ҚАЗ</button>
             <button type="button" class="btn-lang" data-lang="en">ENG</button>
           </div>
-          <label class="deaf-first-toggle mt-6" title="Открывать пакет без синтеза звука (0 сек ожидания для неслышащих студентов)">
+          <label class="deaf-first-toggle mt-6" title="Быстрое создание только конспекта, карты и теста без синтеза речи">
             <input type="checkbox" id="deafFirstCheckbox" />
-            <span>🦻 Режим без звука (Deaf-First · мгновенно)</span>
+            <span>Создать без озвучки (быстрее)</span>
           </label>
-          <label class="deaf-first-toggle mt-6" title="Игнорировать сохранённый кэш и сгенерировать материал и перевод заново">
+          <label class="deaf-first-toggle mt-6" title="Не использовать прошлую сохранённую копию и обработать текст заново">
             <input type="checkbox" id="bypassCacheCheckbox" />
-            <span>🔄 Генерировать заново (без кэша)</span>
+            <span>Создать материал заново</span>
           </label>
         </div>
 
         <button type="button" class="btn-primary-xl" id="btnRunPipeline">
-          Создать учебный пакет →
+          Создать учебный пакет
         </button>
         <div class="pipeline-progress hidden" id="pipelineProgress">
           <div class="progress-steps" id="progressSteps"></div>
@@ -209,38 +203,15 @@
 
     <!-- ПРАВАЯ ГЛАВНАЯ СЦЕНА: Шаг 2 -->
     <section class="stage-main" id="resultsSection" aria-labelledby="sec2-title">
-      <!-- Чистый стартовый экран до первой генерации + витрина всех 4 пресетов -->
+      <!-- Чистый стартовый экран до первой генерации -->
       <div class="empty-state-card" id="emptyStateStage">
-        <div class="empty-state-icon">✦</div>
-        <h2>Превратите любую лекцию в понятный конспект и 2D-мультфильм</h2>
-        <p>Загрузите презентацию, PDF или текст лекции слева, выберите язык результата (Русский, Қазақша или English) и нажмите <strong>«Создать учебный пакет»</strong> — или запустите готовый вузовский курс в 1 клик:</p>
+        <h2>Превратите любую лекцию в понятный конспект и видеоурок</h2>
+        <p>Загрузите презентацию, PDF или текст лекции слева, выберите язык результата и нажмите <strong>«Создать учебный пакет»</strong>.</p>
         <div class="empty-features-row">
-          <div class="empty-feat">🎬 2D-мультфильм 60 FPS</div>
-          <div class="empty-feat">📖 Ясный язык + Цитаты</div>
-          <div class="empty-feat">🗺️ 2-уровневая Mind Map</div>
-          <div class="empty-feat">✅ Умный тест + Подсказки</div>
-        </div>
-        <div class="empty-presets-grid">
-          <button type="button" class="preset-launch-card" data-preset-key="arch">
-            <span class="preset-card-tag">🏛️ Инженерия · КазГАСА</span>
-            <strong>Сейсмоизоляция и диссипация энергии</strong>
-            <span>Слайды + СНиП РК · 5 терминов</span>
-          </button>
-          <button type="button" class="preset-launch-card" data-preset-key="ai">
-            <span class="preset-card-tag">🤖 IT & Computer Science</span>
-            <strong>Архитектура Трансформеров и RAG</strong>
-            <span>Self-Attention + pgvector · 5 терминов</span>
-          </button>
-          <button type="button" class="preset-launch-card" data-preset-key="biz">
-            <span class="preset-card-tag">📊 Экономика · AlmaU</span>
-            <strong>Юнит-экономика и Break-Even стартапа</strong>
-            <span>LTV / CAC ≥ 3:1 + Kaspi кейс · 5 терминов</span>
-          </button>
-          <button type="button" class="preset-launch-card" data-preset-key="kz">
-            <span class="preset-card-tag">🇰🇿 Қазақша · AI-Sana РК</span>
-            <strong>Жасанды интеллект және Айқын тіл</strong>
-            <span>Нейрондық желілер мен RAG · Билингвалды</span>
-          </button>
+          <div class="empty-feat">Видеоурок</div>
+          <div class="empty-feat">Готовый конспект</div>
+          <div class="empty-feat">Mind Map</div>
+          <div class="empty-feat">Полный тест</div>
         </div>
       </div>
 
@@ -297,15 +268,7 @@
       <div id="resultsContentWrap" class="hidden">
         <div class="results-header">
           <div class="results-title-wrap">
-            <div class="badges-row">
-              <button type="button" class="step-badge step-badge-success badge-clickable" id="cacheHitBadge" title="Нажмите, чтобы увидеть отчёт проверки ИИ и сгенерированный код">
-                ✓ Проверено ИИ · Код и отчёт
-              </button>
-              <span class="readability-pill" id="readabilityBadge">Ясность: 96/100</span>
-              <span class="domain-pill" id="domainBadge">Архитектура</span>
-            </div>
-            <h1 id="sec2-title">Адаптированный учебный пакет</h1>
-            <p class="section-desc" id="resultsSubtitle">Выберите удобный формат изучения материала ниже.</p>
+            <h1 id="sec2-title">Учебный пакет</h1>
           </div>
 
           <div class="download-group no-print">
@@ -317,51 +280,52 @@
                 Скачать файлы ▾
               </button>
               <div class="dropdown-menu hidden" id="exportDropdownMenu">
-                <button type="button" class="dropdown-item" id="btnDownloadNotes">📄 Конспект и словарь (.DOC)</button>
-                <button type="button" class="dropdown-item" id="btnPrintPdf">🖨️ Печать / Сохранить как PDF</button>
-                <button type="button" class="dropdown-item" id="btnDownloadMindmap">🗺️ Интеллект-карта (.PNG)</button>
-                <button type="button" class="dropdown-item" id="btnDownloadQuiz">✅ Мини-тест с ответами (.DOC)</button>
-                <button type="button" class="dropdown-item" id="btnDownloadSrt">💬 Субтитры (.SRT)</button>
+                <button type="button" class="dropdown-item" id="btnDownloadNotes">Конспект и словарь (.DOC)</button>
+                <button type="button" class="dropdown-item" id="btnPrintPdf">Печать / Сохранить как PDF</button>
+                <button type="button" class="dropdown-item" id="btnDownloadMindmap">Mind Map (.PNG)</button>
+                <button type="button" class="dropdown-item" id="btnDownloadQuiz">Тест с ответами (.DOC)</button>
+                <button type="button" class="dropdown-item" id="btnDownloadSrt">Субтитры (.SRT)</button>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- Ровно 4 понятные студенческие вкладки -->
+        <!-- 4 чистые вкладки без иконок -->
         <div class="result-tabs no-print" role="tablist">
-          <button type="button" class="result-tab active" data-tab="animation" role="tab">🎬 2D-Мультфильм</button>
-          <button type="button" class="result-tab" data-tab="notes" role="tab">📖 Конспект и термины</button>
-          <button type="button" class="result-tab" data-tab="mindmap" role="tab">🗺️ Интеллект-карта</button>
-          <button type="button" class="result-tab" data-tab="quiz" role="tab">✅ Мини-тест</button>
+          <button type="button" class="result-tab active" data-tab="animation" role="tab">Видео</button>
+          <button type="button" class="result-tab" data-tab="notes" role="tab">Конспект</button>
+          <button type="button" class="result-tab" data-tab="mindmap" role="tab">Mind Map</button>
+          <button type="button" class="result-tab" data-tab="quiz" role="tab">Тест</button>
         </div>
 
-        <!-- ВКЛАДКА 1: 2D-МУЛЬТФИЛЬМ -->
+        <!-- ВКЛАДКА 1: ВИДЕО -->
         <div class="result-panel active" id="tab-animation">
           <div class="video-layout">
             <div class="player-column">
               <div class="player-mode-bar no-print">
                 <div class="player-mode-actions">
-                  <button type="button" class="btn-sup-toggle active" id="btnToggleSupervisorMode">
-                    ✓ После проверки ИИ (PASS) · Показать дефект ДО
-                  </button>
-                  <span class="audio-backend-pill" id="audioBackendBadge">🎙️ Нейроголос HD</span>
-                  <span class="audio-stream-pill hidden" id="audioStreamBadge">🎧 Подготовка звука...</span>
+                  <span class="audio-stream-pill hidden" id="audioStreamBadge">Подготовка звука...</span>
                 </div>
                 <div class="player-mode-actions">
-                  <select id="voiceGenderSelect" class="speed-select player-voice-select" aria-label="Голос диктора" title="Выбор тембра нейронного голоса">
-                    <option value="female" selected>👩 Женский голос</option>
-                    <option value="male">👨 Мужской голос</option>
+                  <select id="voiceGenderSelect" class="speed-select player-voice-select" aria-label="Голос диктора" title="Выбор голоса">
+                    <option value="female" selected>Женский голос</option>
+                    <option value="male">Мужской голос</option>
                   </select>
                   <button type="button" class="btn-chip-dark" id="btnToggleTts">
-                    🔊 Озвучка: ВКЛ
+                    Выключить озвучку
                   </button>
                 </div>
               </div>
 
-              <div class="canvas-wrapper" id="canvasWrapper">
-                <canvas id="animationCanvas" width="1280" height="720" aria-label="2D видео-анимация"></canvas>
+              <div class="canvas-wrapper" id="canvasWrapper" title="Нажмите в любом месте видео для воспроизведения или паузы (двойной клик — на весь экран)">
+                <canvas id="animationCanvas" width="1280" height="720" aria-label="Видео-анимация"></canvas>
+                <div class="stage-big-play" id="stageBigPlayBtn" aria-hidden="true">
+                  <span class="stage-big-play-circle">▶</span>
+                  <span class="stage-big-play-label">Нажмите для запуска</span>
+                </div>
+                <div class="stage-action-pulse hidden" id="stageActionPulse" aria-hidden="true">▶</div>
                 <div class="recording-indicator hidden" id="recordingIndicator">
-                  <span>● Запись 1.0x... <strong id="recordingProgressText">0%</strong></span>
+                  <span>Запись 1.0x... <strong id="recordingProgressText">0%</strong></span>
                   <button type="button" class="btn-cancel-rec" id="btnCancelVideoExport" title="Отменить запись">✕</button>
                 </div>
               </div>
@@ -369,16 +333,16 @@
               <!-- Крупные читаемые субтитры под плеером на мобильном экране -->
               <div class="mobile-live-caption-bar" id="mobileLiveCaptionBar" aria-live="polite">
                 <div class="mobile-caption-meta">
-                  <span id="mobileCaptionBeat">БИТ 1/3</span>
+                  <span id="mobileCaptionBeat">ФРАГМЕНТ 1/3</span>
                   <span id="mobileCaptionCps">12.0 симв/с</span>
                 </div>
-                <div class="mobile-caption-text" id="mobileCaptionText">Нажмите ▶ Играть для запуска видео и субтитров</div>
+                <div class="mobile-caption-text" id="mobileCaptionText">Нажмите «Играть» для запуска видео и субтитров</div>
               </div>
 
               <div class="player-controls no-print">
-                <button type="button" class="btn-player-main" id="btnPlayPause">⏸ Пауза</button>
-                <button type="button" class="btn-player-icon" id="btnPrevScene" title="Назад">⏮</button>
-                <button type="button" class="btn-player-icon" id="btnNextScene" title="Вперёд">⏭</button>
+                <button type="button" class="btn-player-main" id="btnPlayPause">Играть</button>
+                <button type="button" class="btn-player-icon" id="btnPrevScene" title="Назад">◀</button>
+                <button type="button" class="btn-player-icon" id="btnNextScene" title="Вперёд">▶</button>
 
                 <div class="timeline-wrap">
                   <input type="range" id="videoScrubber" min="0" max="1000" value="0" aria-label="Таймлайн" />
@@ -401,7 +365,7 @@
 
             <div class="storyboard-column no-print">
               <div class="storyboard-header">
-                <h3>Сцены мультфильма (6)</h3>
+                <h3>Сцены видео (6)</h3>
                 <p>Нажмите на сцену для перехода</p>
               </div>
               <div class="storyboard-list" id="storyboardList"></div>
@@ -409,15 +373,12 @@
           </div>
         </div>
 
-        <!-- ВКЛАДКА 2: КОНСПЕКТ «ЯСНЫЙ ЯЗЫК» + КАРТОЧКИ -->
+        <!-- ВКЛАДКА 2: КОНСПЕКТ -->
         <div class="result-panel" id="tab-notes">
           <div class="notes-toolbar no-print">
             <div class="view-mode-switch">
-              <button type="button" class="btn-mode btn-notes-mode active" data-notes-mode="dual">Ясный язык + Оригинал</button>
-              <button type="button" class="btn-mode btn-notes-mode" data-notes-mode="plain">Только Ясный язык</button>
-            </div>
-            <div class="notes-hint">
-              Нажмите на <span class="term-highlight-demo">выделенный термин</span>, чтобы увидеть простое объяснение и дактиль.
+              <button type="button" class="btn-mode btn-notes-mode active" data-notes-mode="ready">Готовый конспект</button>
+              <button type="button" class="btn-mode btn-notes-mode" data-notes-mode="original">Оригинал</button>
             </div>
           </div>
 
@@ -426,12 +387,12 @@
             <aside class="glossary-sidebar">
               <div class="glossary-sidebar-header">
                 <div class="glossary-head-top">
-                  <h3>Словарь темы + Дактиль</h3>
+                  <h3>Словарь терминов</h3>
                   <button type="button" class="btn-outline-sm" id="btnToggleFlashcards" title="Режим карточек запоминания к экзамену">
-                    🃏 Карточки
+                    Карточки
                   </button>
                 </div>
-                <input type="search" id="glossarySearchInput" class="form-control mt-6 no-print" placeholder="🔍 Поиск термина или понятия..." aria-label="Поиск по словарю" />
+                <input type="search" id="glossarySearchInput" class="form-control mt-6 no-print" placeholder="Поиск термина..." aria-label="Поиск по словарю" />
               </div>
               <div class="flashcard-stage hidden no-print" id="flashcardStage"></div>
               <div class="glossary-cards-container" id="glossaryCardsContainer"></div>
@@ -439,19 +400,19 @@
           </div>
         </div>
 
-        <!-- ВКЛАДКА 3: ДВУХУРОВНЕВАЯ ИНТЕЛЛЕКТ-КАРТА (Pan & Zoom) -->
+        <!-- ВКЛАДКА 3: MIND MAP -->
         <div class="result-panel" id="tab-mindmap">
           <div class="mindmap-toolbar no-print">
             <div>
-              <h3>Двухуровневая интеллект-карта (Тема → Разделы → Термины)</h3>
-              <p>Перетаскивайте карту мышью, масштабируйте колесом или нажмите на узел для разбора и перехода к сцене</p>
+              <h3>Mind Map</h3>
+              <p>Перетаскивайте карту мышью, масштабируйте колесом или нажмите на узел</p>
             </div>
             <div class="mindmap-actions">
-              <button type="button" class="btn-outline-sm" id="btnZoomIn">➕</button>
-              <button type="button" class="btn-outline-sm" id="btnZoomOut">➖</button>
+              <button type="button" class="btn-outline-sm" id="btnZoomIn">+</button>
+              <button type="button" class="btn-outline-sm" id="btnZoomOut">−</button>
               <button type="button" class="btn-outline-sm" id="btnZoomReset">100%</button>
-              <button type="button" class="btn-outline-sm" id="btnDownloadSvg">📥 .SVG</button>
-              <button type="button" class="btn-primary-sm" id="btnDownloadPng">📥 .PNG</button>
+              <button type="button" class="btn-outline-sm" id="btnDownloadSvg">Скачать SVG</button>
+              <button type="button" class="btn-primary-sm" id="btnDownloadPng">Скачать PNG</button>
             </div>
           </div>
           <div class="mindmap-stage">
@@ -460,26 +421,22 @@
           </div>
         </div>
 
-        <!-- ВКЛАДКА 4: ПОЛНОЦЕННЫЙ АДАПТИВНЫЙ ТЕСТ С ПОДСКАЗКАМИ -->
+        <!-- ВКЛАДКА 4: ПОЛНЫЙ ТЕСТ -->
         <div class="result-panel" id="tab-quiz">
           <div class="quiz-header">
             <div>
               <h3 id="quizHeaderTitle">Тест по материалу (<span id="quizCountBadge">5</span> вопросов)</h3>
-              <p>Используйте «💡 Подсказку» при затруднении или пересоздавайте вопросы под новыми углами.</p>
+              <p>Ответьте на вопросы и нажмите «Проверить ответы».</p>
             </div>
             <div class="quiz-score-box" id="quizScoreBox">Выберите ответы ниже</div>
           </div>
           <div class="quiz-toolbar no-print">
-            <div class="view-mode-switch" id="quizModeSwitch" role="group" aria-label="Режим теста">
-              <button type="button" class="btn-mode btn-quiz-mode active" id="btnQuizModeFull" data-quiz-mode="full">Полный тест</button>
-              <button type="button" class="btn-mode btn-quiz-mode" id="btnQuizModeQuick" data-quiz-mode="quick">Быстрый (5)</button>
-            </div>
             <div class="quiz-toolbar-right">
               <button type="button" class="btn-outline btn-filter-errors hidden" id="btnQuizFilterErrors" title="Показать только вопросы с ошибками или без ответа">
-                🔍 Только ошибки
+                Только ошибки
               </button>
-              <button type="button" class="btn-outline" id="btnRegenerateQuiz" title="Составить новые вопросы по этой же теме с другой интерпретацией">
-                🔄 Пересоздать тест
+              <button type="button" class="btn-outline" id="btnRegenerateQuiz" title="Составить новые вопросы по этой же теме">
+                Пересоздать вопросы
               </button>
             </div>
           </div>
@@ -500,7 +457,7 @@
     <div class="modal-card modal-lg">
       <div class="modal-header">
         <div>
-          <h2>🛡️ Отчёт контролирующей ИИ-модели (AI Supervisor) и код анимации</h2>
+          <h2>Отчёт контролирующей ИИ-модели (AI Supervisor) и код анимации</h2>
           <p>3-эшелонная проверка фактов по силлабусу, скорости субтитров (≤ 15 симв/с) и геометрии кадра.</p>
         </div>
         <button type="button" class="btn-close" id="btnCloseSupervisorModal">✕</button>
@@ -513,7 +470,7 @@
         <div>
           <div class="code-box-header">
             <h3>Сгенерированный код 2D-анимации (Remotion TS)</h3>
-            <button type="button" class="btn-outline-sm" id="btnCopyCode">📋 Копировать код</button>
+            <button type="button" class="btn-outline-sm" id="btnCopyCode">Копировать код</button>
           </div>
           <pre class="code-viewer" id="generatedCodeViewer"><code></code></pre>
         </div>
@@ -535,20 +492,15 @@
     </div>
     <div class="term-popover-body">
       <div class="term-row">
-        <span class="term-row-label">✨ Простыми словами:</span>
+        <span class="term-row-label">Простыми словами:</span>
         <p id="popoverPlainText"></p>
       </div>
       <div class="term-row">
-        <span class="term-row-label">🤟 Дактиль и жест (КЖЯ / РЖЯ):</span>
-        <div class="dactyl-code" id="popoverDactylText"></div>
-        <p class="sign-hint-text" id="popoverSignHintText"></p>
-      </div>
-      <div class="term-row">
-        <span class="term-row-label">📘 Точное определение:</span>
+        <span class="term-row-label">Точное определение:</span>
         <p id="popoverAcademicText"></p>
       </div>
       <div class="term-row">
-        <span class="term-row-label">💡 Пример:</span>
+        <span class="term-row-label">Пример:</span>
         <p id="popoverExampleText"></p>
       </div>
     </div>
@@ -559,7 +511,7 @@
     <div class="modal-card modal-lg">
       <div class="modal-header">
         <div>
-          <h2>💳 Тарифы Lecture AI: Бесплатно + 100 ₸ через Kaspi QR</h2>
+          <h2>Тарифы Lecture AI: Бесплатно + 100 ₸ через Kaspi QR</h2>
           <p>Все функции открыты на бесплатном тарифе с лимитом, а разовая генерация стоит 100 ₸ (пакетом 500 ₸ за 5 лекций).</p>
         </div>
         <button type="button" class="btn-close" id="btnCloseBilling">✕</button>
@@ -596,7 +548,7 @@
               </div>
             </div>
           </div>
-          <button type="button" class="btn-kaspi" id="btnBuyPack500">📱 Оплатить 500 ₸ (Демо +5 ген.)</button>
+          <button type="button" class="btn-kaspi" id="btnBuyPack500">Оплатить 500 ₸ (Демо +5 ген.)</button>
         </div>
         <div class="price-card">
           <div>
@@ -607,11 +559,11 @@
               <li>✓ Оплачивается за счёт лицензии вуза</li>
             </ul>
           </div>
-          <button type="button" class="btn-outline-full" id="btnActivateInclusive">🦻 Активировать грант (+10)</button>
+          <button type="button" class="btn-outline-full" id="btnActivateInclusive">Активировать грант (+10)</button>
         </div>
       </div>
       <div class="ledger-box">
-        <h4>📒 Журнал операций (Two-Phase Credit Ledger)</h4>
+        <h4>Журнал операций (Two-Phase Credit Ledger)</h4>
         <div class="ledger-table-wrap">
           <table class="ledger-table">
             <thead><tr><th>Время</th><th>Операция</th><th>Ключ</th><th>Изм.</th><th>Баланс</th></tr></thead>
@@ -627,8 +579,8 @@
     <div class="modal-card modal-lg">
       <div class="modal-header">
         <div>
-          <h2>🧪 Отзывы тестировщиков (КТ 4 — 5+ пользователей)</h2>
-          <p>Реальные оценки студентов и выгрузка таблицы CSV для экзаменационного отчёта.</p>
+          <h2>Отзывы тестировщиков (КТ 4 — 5+ пользователей)</h2>
+          <p>Реальные оценки студентов.</p>
         </div>
         <button type="button" class="btn-close" id="btnCloseKt4Modal">✕</button>
       </div>
@@ -641,15 +593,18 @@
             <option value="Студент с нарушением слуха (Deaf/HoH)">Студент с нарушением слуха</option>
             <option value="Слышащий студент профильной спец.">Слышащий студент</option>
           </select>
-          <select id="kt4Score" class="form-control">
+          <select id="kt4Score" class="form-control" aria-label="Оценка от 1 до 5">
             <option value="5" selected>Оценка: 5 / 5</option>
             <option value="4">Оценка: 4 / 5</option>
+            <option value="3">Оценка: 3 / 5</option>
+            <option value="2">Оценка: 2 / 5</option>
+            <option value="1">Оценка: 1 / 5</option>
           </select>
         </div>
         <div class="kt4-comment-row mt-6">
           <input type="text" id="kt4Comment" class="form-control" placeholder="Комментарий тестировщика..." />
           <button type="button" class="btn-primary-sm" id="btnSubmitKt4Feedback">Добавить</button>
-          <button type="button" class="btn-outline-sm" id="btnExportKt4Csv">📥 Экспорт .CSV</button>
+          <button type="button" class="btn-outline-sm" id="btnExportKt4Csv">Экспорт .CSV</button>
         </div>
       </div>
       <div class="ledger-table-wrap mt-10">
@@ -666,7 +621,7 @@
     <div class="modal-card">
       <div class="modal-header">
         <div>
-          <h2>🔑 Настройка облачных ИИ-моделей</h2>
+          <h2>Настройка облачных ИИ-моделей</h2>
           <p>Необязательно: приложение работает сразу. При желании укажите свой ключ Google AI Studio или Groq.</p>
         </div>
         <button type="button" class="btn-close" id="btnCloseApiModal">✕</button>
@@ -691,7 +646,7 @@
     <div class="modal-card">
       <div class="modal-header">
         <div>
-          <h2>📱 Открыть с телефона</h2>
+          <h2>Открыть с телефона</h2>
           <p>Отсканируйте QR-код камерой смартфона или поделитесь ссылкой в Telegram / WhatsApp.</p>
         </div>
         <button type="button" class="btn-close" id="btnCloseMobileModal">✕</button>
@@ -702,10 +657,45 @@
           <div class="mobile-qr-hint" id="mobileAccessHint">Убедитесь, что ноутбук и телефон подключены к одному Wi-Fi (или откройте публичную HTTPS-ссылку).</div>
           <input type="text" id="mobileAccessUrl" class="form-control mono-num" readonly />
           <div class="mobile-qr-actions">
-            <button type="button" class="btn-primary-sm" id="btnCopyMobileUrl">📋 Копировать</button>
-            <button type="button" class="btn-outline-sm" id="btnShareMobileUrl">📤 Поделиться</button>
+            <button type="button" class="btn-primary-sm" id="btnCopyMobileUrl">Копировать</button>
+            <button type="button" class="btn-outline-sm" id="btnShareMobileUrl">Поделиться</button>
           </div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модальное окно готовых примеров курсов -->
+  <div class="modal-backdrop hidden no-print" id="presetsModal">
+    <div class="modal-card modal-lg">
+      <div class="modal-header">
+        <div>
+          <h2>Примеры готовых курсов</h2>
+          <p>Выберите курс, чтобы сразу загрузить его и создать учебный пакет.</p>
+        </div>
+        <button type="button" class="btn-close" id="btnClosePresetsModal">✕</button>
+      </div>
+      <div class="empty-presets-grid">
+        <button type="button" class="preset-launch-card" data-preset-key="arch">
+          <span class="preset-card-tag">Инженерия · КазГАСА</span>
+          <strong>Сейсмоизоляция и диссипация энергии</strong>
+          <span>Слайды и СНиП РК</span>
+        </button>
+        <button type="button" class="preset-launch-card" data-preset-key="ai">
+          <span class="preset-card-tag">IT и Computer Science</span>
+          <strong>Архитектура Трансформеров и RAG</strong>
+          <span>Self-Attention и векторный поиск</span>
+        </button>
+        <button type="button" class="preset-launch-card" data-preset-key="biz">
+          <span class="preset-card-tag">Экономика · AlmaU</span>
+          <strong>Юнит-экономика стартапа</strong>
+          <span>LTV, CAC и точка безубыточности</span>
+        </button>
+        <button type="button" class="preset-launch-card" data-preset-key="kz">
+          <span class="preset-card-tag">Қазақша · AI-Sana</span>
+          <strong>Жасанды интеллект және Айқын тіл</strong>
+          <span>Нейрондық желілер мен RAG</span>
+        </button>
       </div>
     </div>
   </div>
@@ -713,23 +703,18 @@
   <!-- Нижняя мобильная навигация (только на экранах <= 900px) -->
   <nav class="mobile-bottom-nav no-print" id="mobileBottomNav" aria-label="Мобильная навигация">
     <button type="button" class="mob-nav-btn active" data-mob-nav="input">
-      <span class="mob-nav-ico">📥</span>
       <span>Ввод</span>
     </button>
     <button type="button" class="mob-nav-btn" data-mob-nav="animation">
-      <span class="mob-nav-ico">🎬</span>
       <span>Видео</span>
     </button>
     <button type="button" class="mob-nav-btn" data-mob-nav="notes">
-      <span class="mob-nav-ico">📖</span>
       <span>Конспект</span>
     </button>
     <button type="button" class="mob-nav-btn" data-mob-nav="mindmap">
-      <span class="mob-nav-ico">🗺️</span>
-      <span>Карта</span>
+      <span>Mind Map</span>
     </button>
     <button type="button" class="mob-nav-btn" data-mob-nav="quiz">
-      <span class="mob-nav-ico">✅</span>
       <span>Тест</span>
     </button>
   </nav>

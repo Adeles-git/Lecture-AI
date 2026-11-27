@@ -19,20 +19,20 @@ window.AISupervisorPipeline = {
         law_hum: "Социология и гуманитарные науки"
       },
       moduleBadges: {
-        actor_network_web: { badge: "🌐 1. Сеть взаимодействий", title: "Субъекты, группы и среда" },
-        social_stratification_pyramid: { badge: "🏛️ 2. Иерархия и уровни", title: "Структура и уровни системы" },
-        scales_balance_norm: { badge: "⚖️ 1. Баланс и норма", title: "Равновесие факторов и правил" },
-        bio_cell_cycle: { badge: "🧬 1. Живая клетка и цикл", title: "Клеточный механизм в действии" },
-        bio_pathway: { badge: "🔬 2. Био-путь и реакция", title: "Последовательность биопроцесса" },
-        econ_funnel_waterfall: { badge: "📊 1. Воронка и баланс", title: "Движение ресурса и эффективность" },
-        cs_layered_pipeline: { badge: "💻 1. Стек и поток данных", title: "Архитектура обработки данных" },
-        eng_structural_forces: { badge: "📐 1. Силы и конструкция", title: "Распределение усилий в системе" },
-        system_anatomy: { badge: "🧩 2. Устройство системы", title: "Как части работают вместе" },
-        chronicle_timeline: { badge: "⏳ 4. Лента этапов", title: "Последовательность и эволюция" },
-        split_versus_duel: { badge: "⚡ 3. Сравнение подходов", title: "Два взгляда: наивный vs научный" },
-        multi_mode_chart: { badge: "📈 4. Закономерность", title: "Как один фактор меняет другой" },
-        case_dossier_blueprint: { badge: "📋 5. Разбор на практике", title: "Прикладная задача и решение" },
-        radial_constellation_map: { badge: "✨ 6. Карта к экзамену", title: "Все понятия урока в единой системе" },
+        actor_network_web: { badge: "🌐 Сеть взаимодействий", title: "Субъекты, группы и среда" },
+        social_stratification_pyramid: { badge: "🏛️ Иерархия и уровни", title: "Структура и уровни системы" },
+        scales_balance_norm: { badge: "⚖️ Баланс и норма", title: "Равновесие факторов и правил" },
+        bio_cell_cycle: { badge: "🧬 Живая клетка и цикл", title: "Клеточный механизм в действии" },
+        bio_pathway: { badge: "🔬 Био-путь и реакция", title: "Последовательность биопроцесса" },
+        econ_funnel_waterfall: { badge: "📊 Воронка и баланс", title: "Движение ресурса и эффективность" },
+        cs_layered_pipeline: { badge: "💻 Стек и поток данных", title: "Архитектура обработки данных" },
+        eng_structural_forces: { badge: "📐 Силы и конструкция", title: "Распределение усилий в системе" },
+        system_anatomy: { badge: "🧩 Устройство системы", title: "Как части работают вместе" },
+        chronicle_timeline: { badge: "⏳ Лента этапов", title: "Последовательность и эволюция" },
+        split_versus_duel: { badge: "⚡ Сравнение подходов", title: "Два взгляда: бытовой vs научный" },
+        multi_mode_chart: { badge: "📈 Закономерность", title: "Как один фактор меняет другой" },
+        case_dossier_blueprint: { badge: "📋 Разбор на практике", title: "Прикладная задача и решение" },
+        radial_constellation_map: { badge: "✨ Карта к экзамену", title: "Все понятия урока в единой системе" },
         cause_effect_flow: { badge: "🔗 Причина → Следствие", title: "Цепочка причин и последствий" },
         worked_example: { badge: "🧮 Пошаговый разбор", title: "Практический пример по шагам" },
         causal_curve: { badge: "📉 Кривая влияния", title: "Динамика изменений и порог" },
@@ -61,20 +61,20 @@ window.AISupervisorPipeline = {
         law_hum: "Әлеуметтану және гуманитарлық ғылымдар"
       },
       moduleBadges: {
-        actor_network_web: { badge: "🌐 1. Өзара байланыс торы", title: "Топтар мен ортаның байланысы" },
-        social_stratification_pyramid: { badge: "🏛️ 2. Құрылым деңгейлері", title: "Жүйе сатылары мен құрылымы" },
-        scales_balance_norm: { badge: "⚖️ 1. Тепе-теңдік пен норма", title: "Қағидалар мен факторлар теңгерімі" },
-        bio_cell_cycle: { badge: "🧬 1. Жасуша және цикл", title: "Биологиялық механизм жұмысы" },
-        bio_pathway: { badge: "🔬 2. Био-ағын", title: "Процестің кезеңдік тізбегі" },
-        econ_funnel_waterfall: { badge: "📊 1. Құндылық ағыны", title: "Ресурс қозғалысы мен нәтиже" },
-        cs_layered_pipeline: { badge: "💻 1. Деректер стегі", title: "Ақпаратты өңдеу архитектурасы" },
-        eng_structural_forces: { badge: "📐 1. Күштер мен құрылым", title: "Жүктеме мен тұрақтылық сызбасы" },
-        system_anatomy: { badge: "🧩 2. Жүйе құрылысы", title: "Бөліктердің өзара жұмысы" },
-        chronicle_timeline: { badge: "⏳ 4. Уақыт пен кезеңдер", title: "Даму мен процестің реті" },
-        split_versus_duel: { badge: "⚡ 3. Тәсілдерді салыстыру", title: "Екі көзқарас: қате vs дұрыс" },
-        multi_mode_chart: { badge: "📈 4. Заңдылық графигі", title: "Факторлардың өзара әсері" },
-        case_dossier_blueprint: { badge: "📋 5. Тәжірибелік талдау", title: "Нақты жағдайда қолдану" },
-        radial_constellation_map: { badge: "✨ 6. Емтихан картасы", title: "Тақырыптың негізгі ұғымдар жүйесі" },
+        actor_network_web: { badge: "🌐 Өзара байланыс торы", title: "Топтар мен ортаның байланысы" },
+        social_stratification_pyramid: { badge: "🏛️ Құрылым деңгейлері", title: "Жүйе сатылары мен құрылымы" },
+        scales_balance_norm: { badge: "⚖️ Тепе-теңдік пен норма", title: "Қағидалар мен факторлар теңгерімі" },
+        bio_cell_cycle: { badge: "🧬 Жасуша және цикл", title: "Биологиялық механизм жұмысы" },
+        bio_pathway: { badge: "🔬 Био-ағын", title: "Процестің кезеңдік тізбегі" },
+        econ_funnel_waterfall: { badge: "📊 Құндылық ағыны", title: "Ресурс қозғалысы мен нәтиже" },
+        cs_layered_pipeline: { badge: "💻 Деректер стегі", title: "Ақпаратты өңдеу архитектурасы" },
+        eng_structural_forces: { badge: "📐 Күштер мен құрылым", title: "Жүктеме мен тұрақтылық сызбасы" },
+        system_anatomy: { badge: "🧩 Жүйе құрылысы", title: "Бөліктердің өзара жұмысы" },
+        chronicle_timeline: { badge: "⏳ Уақыт пен кезеңдер", title: "Даму мен процестің реті" },
+        split_versus_duel: { badge: "⚡ Тәсілдерді салыстыру", title: "Екі көзқарас: қате vs дұрыс" },
+        multi_mode_chart: { badge: "📈 Заңдылық графигі", title: "Факторлардың өзара әсері" },
+        case_dossier_blueprint: { badge: "📋 Тәжірибелік талдау", title: "Нақты жағдайда қолдану" },
+        radial_constellation_map: { badge: "✨ Емтихан картасы", title: "Тақырыптың негізгі ұғымдар жүйесі" },
         cause_effect_flow: { badge: "🔗 Себеп → Салдар", title: "Себеп-салдар тізбегі" },
         worked_example: { badge: "🧮 Қадамдық талдау", title: "Практикалық мысалды шешу" },
         causal_curve: { badge: "📉 Әсер қисығы", title: "Өзгеріс динамикасы мен шек" },
@@ -103,20 +103,20 @@ window.AISupervisorPipeline = {
         law_hum: "Sociology & Humanities"
       },
       moduleBadges: {
-        actor_network_web: { badge: "🌐 1. Interaction Network", title: "Groups, Actors & Environment" },
-        social_stratification_pyramid: { badge: "🏛️ 2. System Hierarchy", title: "Core Levels & Structure" },
-        scales_balance_norm: { badge: "⚖️ 1. Balance & Norm", title: "Equilibrium of Rules & Factors" },
-        bio_cell_cycle: { badge: "🧬 1. Cell & Cycle", title: "Living Mechanism in Action" },
-        bio_pathway: { badge: "🔬 2. Bio-Pathway", title: "Step-by-Step Biological Flow" },
-        econ_funnel_waterfall: { badge: "📊 1. Funnel & Balance", title: "Value Flow & Efficiency" },
-        cs_layered_pipeline: { badge: "💻 1. Data Stack", title: "Layered Processing Pipeline" },
-        eng_structural_forces: { badge: "📐 1. Forces & Structure", title: "Force Distribution Blueprint" },
-        system_anatomy: { badge: "🧩 2. System Anatomy", title: "How Components Work Together" },
-        chronicle_timeline: { badge: "⏳ 4. Stage Timeline", title: "Chronology & Process Sequence" },
-        split_versus_duel: { badge: "⚡ 3. Approach Duel", title: "Naive View vs Core Method" },
-        multi_mode_chart: { badge: "📈 4. Key Pattern", title: "How Factor A Shapes Outcome B" },
-        case_dossier_blueprint: { badge: "📋 5. Practical Case", title: "Real-World Application" },
-        radial_constellation_map: { badge: "✨ 6. Exam Concept Map", title: "Complete Concept Synthesis" },
+        actor_network_web: { badge: "🌐 Interaction Network", title: "Groups, Actors & Environment" },
+        social_stratification_pyramid: { badge: "🏛️ System Hierarchy", title: "Core Levels & Structure" },
+        scales_balance_norm: { badge: "⚖️ Balance & Norm", title: "Equilibrium of Rules & Factors" },
+        bio_cell_cycle: { badge: "🧬 Cell & Cycle", title: "Living Mechanism in Action" },
+        bio_pathway: { badge: "🔬 Bio-Pathway", title: "Step-by-Step Biological Flow" },
+        econ_funnel_waterfall: { badge: "📊 Funnel & Balance", title: "Value Flow & Efficiency" },
+        cs_layered_pipeline: { badge: "💻 Data Stack", title: "Layered Processing Pipeline" },
+        eng_structural_forces: { badge: "📐 Forces & Structure", title: "Force Distribution Blueprint" },
+        system_anatomy: { badge: "🧩 System Anatomy", title: "How Components Work Together" },
+        chronicle_timeline: { badge: "⏳ Stage Timeline", title: "Chronology & Process Sequence" },
+        split_versus_duel: { badge: "⚡ Approach Duel", title: "Naive View vs Core Method" },
+        multi_mode_chart: { badge: "📈 Key Pattern", title: "How Factor A Shapes Outcome B" },
+        case_dossier_blueprint: { badge: "📋 Practical Case", title: "Real-World Application" },
+        radial_constellation_map: { badge: "✨ Exam Concept Map", title: "Complete Concept Synthesis" },
         cause_effect_flow: { badge: "🔗 Cause → Effect", title: "Causal Chain & Mechanism" },
         worked_example: { badge: "🧮 Worked Example", title: "Step-by-Step Solution" },
         causal_curve: { badge: "📉 Causal Curve", title: "Factor Dynamics & Threshold" },
@@ -157,21 +157,19 @@ window.AISupervisorPipeline = {
   // =========================================================================
   sanitizeAndExtractMeta(rawTitle, rawLectureText) {
     let text = String(rawLectureText || "");
-    // Срезаем служебные обёртки загрузчика файлов
     text = text.replace(/^\[(?:Материал преподавателя|Файл|Аудиозапись лекции)\s*:[^\]]*\]\s*/gim, "");
-    // Очищаем поля Word HYPERLINK "..." \o "..." (оставляя видимый текст ссылки!)
-    text = text.replace(/HYPERLINK\s+"[^"]*"(?:\s+\\[a-z]\s+"[^"]*")?\s*/gi, "");
-    // Убираем колонтитулы Word PAGE / PAGE 2 и технические артефакты XML/PDF
+    text = text.replace(/\bHYPERLINK\s+"[^"]*"(?:\s+\\[a-z]\s+"[^"]*")?\s*/gi, "");
+    text = text.replace(/\b(?:PAGEREF|TOC|SEQ|REF|STYLEREF|EMBED|INCLUDEPICTURE|SHAPE)\s+[^\n\r]{1,80}/gi, " ");
     text = text.replace(/^\s*PAGE(?:\s+\d+)?\s*$/gim, "");
-    text = text.replace(/\b(?:MERGEFORMAT|themeManager\.xml\.rels\S*|schemas\.openxmlformats\.org\S*|ds:datastoreItem\S*|ds:itemID\S*|SelectedStyle)\b/gi, " ");
+    text = text.replace(/\b(?:HYPERLINK|MERGEFORMAT|FORMTEXT|themeManager\.xml\.rels\S*|schemas\.openxmlformats\.org\S*|ds:datastoreItem\S*|ds:itemID\S*|SelectedStyle)\b/gi, " ");
     text = text.replace(/[\u00a0\t]+/g, " ");
     text = text
       .split(/\r?\n/)
       .map((ln) => ln.replace(/\s+/g, " ").trim())
       .filter((ln) => {
-        if (!ln) return true; // пустые строки пока сохраняем для абзацев
-        if (/^(?:URL\s*:|https?:\/\/|ISBN\s*[\d-]+|_{3,})/i.test(ln)) return false;
-        if (/^\d{1,3}$/.test(ln)) return false; // одиночный номер страницы
+        if (!ln) return true;
+        if (/^(?:URL\s*:|https?:\/\/|ISBN\s*[\d-]+|_{3,}|-{4,}|={4,})/i.test(ln)) return false;
+        if (/^\d{1,3}$/.test(ln)) return false;
         return true;
       })
       .join("\n");
@@ -180,22 +178,52 @@ window.AISupervisorPipeline = {
     const isGenericFileTitle =
       !cleanTitle ||
       /^Загруженный курс\s*·/i.test(cleanTitle) ||
-      /(?:^|[^А-Яа-яЁёA-Za-z0-9])(?:АРМ|МСПЗ|СРС|СРСП|УМКД)(?=$|[^А-Яа-яЁёA-Za-z0-9])/i.test(cleanTitle);
+      /(?:^|[^А-Яа-яЁёA-Za-z0-9])(?:АРМ|МСПЗ|СРС|СРСП|УМКД|ПЗ\s+|копия|copy)(?=$|[^А-Яа-яЁёA-Za-z0-9])/i.test(cleanTitle);
 
     if (isGenericFileTitle) {
-      const headChunk = text.slice(0, 1400);
-      const semMatch =
+      const headChunk = text.slice(0, 1600);
+      const topicMatch =
+        headChunk.match(/(?:по\s+теме|на\s+тему)\s*[:«"]+\s*([^\n»"]{6,100})[»"]?/i) ||
         headChunk.match(/(?:Семинар|Лекция|Тема|Модуль|Дәріс|Тақырып)\s*№?\s*\d*[:.]?\s*[«"]([^»"]{8,105})[»"]/i) ||
-        headChunk.match(/\[Слайд\s*1\s*:\s*([^\]]{8,100})\]/i) ||
+        headChunk.match(/\[(?:Слайд|Slide|\d+-слайд)\s*\d*\s*:\s*([^\]]{8,100})\]/i) ||
         headChunk.match(/Дисциплина\s*[«"]([^»"]{8,100})[»"]/i);
-      if (semMatch && semMatch[1]) {
-        cleanTitle = semMatch[1].trim();
+      if (topicMatch && topicMatch[1]) {
+        cleanTitle = topicMatch[1].replace(/[«»".,:;]+$/, "").trim();
       } else {
-        cleanTitle = cleanTitle.replace(/^Загруженный курс\s*·\s*/i, "").trim() || "Учебная лекция";
+        cleanTitle = cleanTitle.replace(/^Загруженный курс\s*·\s*/i, "").replace(/\s*(?:копия|copy)\s*$/i, "").trim() || "Учебная лекция";
       }
     }
 
     return { cleanTitle, cleanText: text.trim() };
+  },
+
+  // Умная разбивка на предложения: не режет на г., т.е., рис., П. Бергер и внутри скобок
+  splitSentencesSmart(rawText) {
+    const src = String(rawText || "").replace(/\s+/g, " ").trim();
+    if (!src) return [];
+    const abbrRe = /(?:^|\s)(?:г|гг|т\.?\s*е|т\.?\s*д|т\.?\s*п|др|пр|см|рис|табл|ст|п|гл|им|проф|доц|гр|уч|тыс|млн|млрд|стр|с|в|вв|ж|жж|[А-ЯЁA-Z])\.$/i;
+    const out = [];
+    let start = 0;
+    let parenDepth = 0;
+    for (let i = 0; i < src.length; i++) {
+      const ch = src[i];
+      if (ch === "(" || ch === "«") parenDepth++;
+      else if (ch === ")" || ch === "»") parenDepth = Math.max(0, parenDepth - 1);
+      if (parenDepth === 0 && (ch === "." || ch === "!" || ch === "?")) {
+        const nextCh = src[i + 1] || "";
+        const afterNext = src[i + 2] || "";
+        if (nextCh && !/\s/.test(nextCh)) continue;
+        if (ch === "." && abbrRe.test(src.slice(Math.max(start, i - 14), i + 1))) continue;
+        // Не рвём, если следующее слово начинается с маленькой буквы (кроме цифр и кавычек)
+        if (ch === "." && nextCh && /\s/.test(nextCh) && /^[а-яёәіңғүұқөһa-z]/.test(afterNext)) continue;
+        const sent = src.slice(start, i + 1).trim();
+        if (sent.length > 8) out.push(sent);
+        start = i + 1;
+      }
+    }
+    const tail = src.slice(start).trim();
+    if (tail.length > 8) out.push(tail);
+    return out;
   },
 
   // =========================================================================
@@ -214,14 +242,14 @@ window.AISupervisorPipeline = {
         continue;
       }
 
-      // Отсекаем шапку вуза, силлабусные реквизиты и оглавление «План семинара» в начале файла
-      if (i < 18) {
+      // Отсекаем шапку вуза, титульники пояснительных записок и оглавление в начале файла
+      if (i < 20) {
         if (/^(?:Краткое\s+содержание|Содержание\s+лекции|Основная\s+часть)\s*:?$/i.test(ln)) {
           coreLines.length = 0;
           continue;
         }
         if (
-          /^(?:МЕЖДУНАРОДНАЯ ОБРАЗОВАТЕЛЬНАЯ|МИНИСТЕРСТВО|УНИВЕРСИТЕТ|КАФЕДРА|АКТИВНЫЙ РАЗДАТОЧНЫЙ|Дисциплина\s*[«"]|\d+\s*модуль\s*[—–-]|\d+\s*кредит|часов\s*:\s*лекционных|План\s+(?:семинара|лекции|занятия)\s*:?)/i.test(ln) ||
+          /^(?:МЕЖДУНАРОДНАЯ ОБРАЗОВАТЕЛЬНАЯ|КАЗАХСКАЯ ГОЛОВНАЯ|МИНИСТЕРСТВО|УНИВЕРСИТЕТ|КАФЕДРА|ФАКУЛЬТЕТ|АКТИВНЫЙ РАЗДАТОЧНЫЙ|ПОЯСНИТЕЛЬНАЯ\s+ЗАПИСКА|ПОЙСНИТЕЛЬНАЯ\s+ЗАПИСКА|КУРСОВОЙ\s+ПРОЕКТ|ВЫПУСКНАЯ\s+РАБОТА|Дисциплина\s*[«"]|Выполнил\s*:|Проверил\s*:|Руководитель\s*:|Студент(?:ка)?\s+гр|\d+\s*модуль\s*[—–-]|\d+\s*кредит|часов\s*:\s*лекционных|План\s+(?:семинара|лекции|занятия)\s*:?)/i.test(ln) ||
           /\d{4}\/\d{2}\s*уч\.\s*год/i.test(ln) ||
           (/^\d+\.\s+[А-ЯЁ]/.test(ln) && ln.length < 95 && i < 14)
         ) {
@@ -232,18 +260,16 @@ window.AISupervisorPipeline = {
         }
       }
 
-      // Явный заголовок слайда всегда возвращает разбор в основное тело лекции
-      if (/^\[(?:Слайд|Slide|Дәріс|Бөлім)\s*\d+/i.test(ln)) {
+      // Явный заголовок слайда всегда возвращает разбор в основное тело лекции (RU / KK / EN)
+      if (/^\[(?:(?:Слайд|Slide|Дәріс|Бөлім)\s*\d+|\d+-слайд)/i.test(ln)) {
         zone = "CORE";
       }
 
-      // Переход во встроенный «Глоссарий» в конце документа
       if (/^(?:Глоссарий|Словарь\s+терминов|Основные\s+термины|Терминдер\s+сөздігі|Glossary)\s*:?$/i.test(ln)) {
         zone = "GLOSSARY";
         continue;
       }
 
-      // Отсечение контрольных вопросов, тем проектов, заданий СРС и списка литературы (без ASCII \b на кириллице!)
       if (
         /^(?:Контрольные\s+вопросы|Вопросы\s+для\s+самоконтроля|Тематика\s+проектов|Темы\s+проектов|Темы\s+рефератов|Задание\s+на\s+СРС|Задание\s+на\s+СРСП|Литература|Обязательная\s+литература|Дополнительная\s+литература|Список\s+литературы|Библиография)(?:\s*[:.]|\s|$)/i.test(ln)
       ) {
@@ -258,11 +284,8 @@ window.AISupervisorPipeline = {
         continue;
       }
 
-      if (zone === "TAIL") {
-        continue;
-      }
+      if (zone === "TAIL") continue;
 
-      // Фильтруем библиографические строки ГОСТ, если они попались без заголовка «Литература»
       if (/(?:Учебное\s+пособие|Текст\s*:\s*электронный|Цифровой\s+образовательный\s+ресурс|IPR\s*(?:SMART|Books)|ISBN\s*[\d-])/i.test(ln)) {
         continue;
       }
@@ -272,10 +295,11 @@ window.AISupervisorPipeline = {
 
     const coreText = coreLines.join("\n").replace(/\n{3,}/g, "\n\n").trim();
 
-    // 1. Если в тексте есть явные маркеры [Слайд N: ...]
-    if (/\[(?:Слайд|Slide|Дәріс|Бөлім)\s*\d+/i.test(coreText)) {
+    // 1. Если в тексте есть явные маркеры [Слайд N: ...] или [N-слайд: ...]
+    const slideTagRe = /\[(?:(?:Слайд|Slide|Дәріс|Бөлім)\s*\d+|\d+-слайд)[^\]]*\]/i;
+    if (slideTagRe.test(coreText)) {
       const slideBlocks = coreText
-        .split(/(?=\[(?:Слайд|Slide|Дәріс|Бөлім)\s*\d+)/i)
+        .split(/(?=\[(?:(?:Слайд|Slide|Дәріс|Бөлім)\s*\d+|\d+-слайд))/i)
         .map((b) => b.trim())
         .filter((b) => b.length > 25);
       if (slideBlocks.length >= 2) {
@@ -287,7 +311,7 @@ window.AISupervisorPipeline = {
             const rawBracket = hm ? hm[1].trim() : "";
             const numMatch = rawBracket.match(/\d+/);
             const slideNum = numMatch ? parseInt(numMatch[0], 10) : sIdx + 1;
-            const cleanHead = hm ? rawBracket.replace(/^(?:Слайд|Slide|\d+-слайд|Дәріс|Бөлім)\s*\d*\s*[:.—–-]?\s*/i, "").trim() : "";
+            const cleanHead = hm ? rawBracket.replace(/^(?:(?:Слайд|Slide|Дәріс|Бөлім)\s*\d*|\d+-слайд)\s*[:.—–-]?\s*/i, "").trim() : "";
             const body = hm ? hm[2].trim() : b;
             return {
               heading: cleanHead,
@@ -301,11 +325,8 @@ window.AISupervisorPipeline = {
       }
     }
 
-    // 2. Умная сборка разделов по смысловым подзаголовкам, спискам и абзацам (для любых .doc/.docx/.pdf)
-    const paragraphs = coreLines
-      .map((l) => l.trim())
-      .filter(Boolean);
-
+    // 2. Умная сборка разделов по смысловым подзаголовкам, спискам и абзацам
+    const paragraphs = coreLines.map((l) => l.trim()).filter(Boolean);
     const blocks = [];
     let cur = { heading: "", lines: [], bullets: [] };
     const flushCur = () => {
@@ -320,9 +341,19 @@ window.AISupervisorPipeline = {
       cur = { heading: "", lines: [], bullets: [] };
     };
 
+    const normalizeListHeader = (rawH) => {
+      const h = rawH.replace(/:$/, "").trim();
+      const verbTailMatch = h.match(/^(.{6,60}?)\s+(?:позволяет|помогает|обеспечивает|включает|делится\s+на|состоит\s+из)$/i);
+      return {
+        cleanTitle: verbTailMatch ? verbTailMatch[1].trim() : h,
+        fullLead: h
+      };
+    };
+
     for (let i = 0; i < paragraphs.length; i++) {
       const p = paragraphs[i];
-      const isBullet = /^(?:[✓✔•●▪–—-]|\d+[.)])\s+/.test(p) || (cur.lines.length > 0 && /:\s*$/.test(cur.lines[cur.lines.length - 1]) && /^[а-яёa-z]/.test(p));
+      const prevLine = cur.lines[cur.lines.length - 1] || "";
+      const isBullet = /^(?:[✓✔•●▪–—-]|\d+[.)])\s+/.test(p) || (cur.lines.length > 0 && /:\s*$/.test(prevLine) && /^[а-яёa-z]/.test(p));
       const isShortHeading =
         !isBullet &&
         p.length >= 10 &&
@@ -334,22 +365,39 @@ window.AISupervisorPipeline = {
 
       const curCharLen = cur.lines.join(" ").length;
 
-      if (isShortHeading && curCharLen > 120) {
-        flushCur();
-        cur.heading = p.replace(/:$/, "").trim();
+      // Если строка заканчивается на ":" и за ней идут пункты списка — не отрываем подлежащее от пунктов!
+      const nextP = paragraphs[i + 1] || "";
+      const isLeadWithColon = /:\s*$/.test(p) && nextP && (/^[а-яёa-z]/.test(nextP) || /^(?:[✓✔•●▪–—-]|\d+[.)])\s+/.test(nextP));
+
+      if (isShortHeading && (curCharLen > 120 || curCharLen === 0)) {
+        if (curCharLen > 120) flushCur();
+        const hdr = normalizeListHeader(p);
+        cur.heading = hdr.cleanTitle;
+        if (isLeadWithColon) {
+          // Сохраняем фразу-связку (напр. "Социологическое воображение позволяет ..."), чтобы пункты не теряли подлежащее
+          cur._pendingLead = hdr.fullLead;
+        }
         continue;
       }
-      if (isShortHeading && curCharLen === 0) {
-        cur.heading = p.replace(/:$/, "").trim();
-        continue;
-      }
-      if (isAspectStarter && curCharLen >= 280) {
+      if (isAspectStarter && curCharLen >= 260) {
         flushCur();
       }
 
       if (isBullet) {
         const cleanB = p.replace(/^(?:[✓✔•●▪–—-]|\d+[.)])\s+/, "").replace(/[;.]$/, "").trim();
-        if (cleanB.length > 8) cur.bullets.push(cleanB);
+        if (cleanB.length > 8) {
+          const fullB = cur._pendingLead && /^[а-яёa-z]/.test(cleanB)
+            ? `${cur._pendingLead} ${cleanB}`
+            : cleanB;
+          cur.bullets.push(this.capitalizeFirst(fullB));
+        }
+        if (cur._pendingLead && /^[а-яёa-z]/.test(cleanB)) {
+          cur.lines.push(`${cur._pendingLead} ${cleanB}.`);
+          cur._pendingLead = "";
+          continue;
+        }
+      } else {
+        cur._pendingLead = "";
       }
       cur.lines.push(p);
 
@@ -359,13 +407,8 @@ window.AISupervisorPipeline = {
     }
     flushCur();
 
-    // Балансировка: если получился всего 1–2 крупных блока, делим по предложениям на 4 осмысленные части
-    if (blocks.length <= 2 && coreText.length > 340) {
-      const allSents = coreText
-        .replace(/\n+/g, " ")
-        .split(/(?<=[.!?])\s+/)
-        .map((s) => s.trim())
-        .filter((s) => s.length > 15);
+    if (blocks.length <= 2 && coreText.length > 300) {
+      const allSents = this.splitSentencesSmart(coreText).filter((s) => s.length > 15);
       if (allSents.length >= 4) {
         const targetCount = Math.min(5, Math.max(3, Math.ceil(allSents.length / 3)));
         const chunkSize = Math.ceil(allSents.length / targetCount);
@@ -510,28 +553,24 @@ window.AISupervisorPipeline = {
     const coreText = segmented.coreText || cleanDoc;
     const docGlossaryLines = embeddedGlossaryLines.length ? embeddedGlossaryLines : segmented.embeddedGlossaryLines;
 
-    const sentences = coreText
-      .replace(/\n+/g, " ")
-      .split(/(?<=[.!?])\s+/)
-      .map((s) => s.trim())
-      .filter((s) => s.length > 20);
+    const sentences = this.splitSentencesSmart(coreText).filter((s) => s.length > 20);
 
     // Уровень 2: NLP-извлечение настоящих определений прямо из предложений лекции
     if (parsed.length < 6) {
       for (const sent of sentences) {
         if (parsed.length >= 6) break;
 
-        // 2А: «называется X (...) — определением» или «называется X»
-        const namedMatch = sent.match(/называется\s+([а-яёәіңғүұқөһa-zА-ЯЁӘІҢҒҮҰҚӨҺA-Z\s-]{4,42}?)(?:\s*\([^)]{2,65}\))?\s*[—–-]\s*([^.!?]{12,200})/i);
+        // 2А: «называется X (...) — определением»
+        const namedMatch = sent.match(/называется\s+([а-яёәіңғүұқөһa-zА-ЯЁӘІҢҒҮҰҚӨҺA-Z\s-]{4,42}?)(?:\s*\([^)]{2,65}\))?\s+[—–-]\s+([^.!?]{12,200})/i);
         if (namedMatch) {
           const normTerm = this.normalizeInstrumentalTerm(namedMatch[1]);
-          addTerm(normTerm, namedMatch[2], `Определение из текста лекции: «${sent.slice(0, 140)}»`);
+          addTerm(normTerm, namedMatch[2], `Определение из текста лекции: «${this.shortLabel(sent, 130)}»`);
           continue;
         }
 
-        // 2Б: «Термин — это ...» / «Как писал ..., термин — это ...» / «Термин представляет собой ...»
+        // 2Б: «Термин — это ...» (строго с пробелами вокруг тире, чтобы не резать дефисные слова!)
         const cleanedSent = sent.replace(/^(?:Как\s+писал\s+[^,]+,\s*|В\s+[а-яё]+\s+[а-яё]+\s+|Современн[а-я]+\s+)/i, "");
-        const dashMatch = cleanedSent.match(/^([А-Яа-яЁёӘәІіҢңҒғҮүҰұҚқӨөҺһA-Za-z][А-Яа-яЁёӘәІіҢңҒғҮүҰұҚқӨөҺһA-Za-z0-9\s/-]{3,44}?)\s*(?:\([^)]{2,55}\)\s*)?(?:[—–-]\s*(?:это\s+)?|представляет\s+собой\s+|дегеніміз\s*[—–-]?\s*)([^.!?]{14,220})/i);
+        const dashMatch = cleanedSent.match(/^([А-Яа-яЁёӘәІіҢңҒғҮүҰұҚқӨөҺһA-Za-z][А-Яа-яЁёӘәІіҢңҒғҮүҰұҚқӨөҺһA-Za-z0-9\s/-]{3,44}?)\s*(?:\([^)]{2,55}\)\s*)?(?:\s+[—–-]\s+(?:это\s+)?|\s+представляет\s+собой\s+|\s+дегеніміз\s*[—–-]?\s*)([^.!?]{14,220})/i);
         if (dashMatch) {
           addTerm(dashMatch[1], dashMatch[2], `Определение из текста лекции.`);
           continue;
@@ -704,11 +743,7 @@ window.AISupervisorPipeline = {
     const t1 = (glossary[1]?.term || t0).split(/[/(]/)[0].trim();
     const p0 = (glossary[0]?.plain || "основной механизм темы").replace(/[.!?]+$/, "");
 
-    const sents = String(lectureText || "")
-      .replace(/\n+/g, " ")
-      .split(/(?<=[.!?])\s+/)
-      .map((s) => s.trim())
-      .filter((s) => s.length > 20);
+    const sents = this.splitSentencesSmart(lectureText).filter((s) => s.length > 20);
 
     const contrastSent = sents.find((s) => /(?:^|\s)(?:в отличие от|отличается от|отказаться от|если\s+[^,]+не\s+|без\s+[а-яё]+)(?=\s|[,.:;!?]|$)/i.test(s));
     const formulaMatch = String(lectureText || "").match(/([A-Za-zА-Яа-яЁё_0-9()]+\s*[=≈≠≥≤]\s*[A-Za-zА-Яа-яЁё_0-9.\s+\-*/()]{2,28})/);
@@ -776,7 +811,7 @@ window.AISupervisorPipeline = {
     let yAxisLabel = base.yAxisLabel;
     let curveALabel = `С учётом: ${t0}`;
     let curveBLabel = "Без учёта фактора";
-    let defaultSecLabel = sections[0]?.title?.slice(0, 36) || domainProfile.name;
+    let defaultSecLabel = this.shortLabel(sections[0]?.title || domainProfile.name, 34);
 
     if (langTag === "en") {
       leftFail = { title: "Without Method ❌", sub: "Unstructured / error-prone approach", metric: metrics[0] || "High risk" };
@@ -797,8 +832,9 @@ window.AISupervisorPipeline = {
     }
 
     return {
+      metrics,
       dangerMetric: {
-        value: metrics[0] || t0.slice(0, 22),
+        value: metrics[0] || this.shortLabel(t0, 22),
         label: defaultSecLabel
       },
       deltaBadge,
@@ -835,26 +871,24 @@ window.AISupervisorPipeline = {
           ? sourceType === "slide" ? `Slide ${sourceIndex}` : `Section ${sourceIndex}`
           : sourceType === "slide" ? `Слайд ${sourceIndex}` : `Раздел ${sourceIndex}`;
 
-    const clean = rawBody.replace(/^\[.*?\]\s*/g, "").trim();
-    const sentences = clean
-      .split(/(?<=[.!?])\s+/)
-      .map((s) => s.trim())
-      .filter((s) => s.length > 8);
+    const clean = rawBody.replace(/^\[(?:(?:Слайд|Slide|Дәріс|Бөлім)\s*\d+|\d+-слайд)[^\]]*\]\s*/gi, "").trim();
+    const sentences = this.splitSentencesSmart(clean).filter((s) => s.length > 8);
 
     const origWordsCount = clean.split(/\s+/).filter(Boolean).length;
     const origAvgLen = Math.max(12, Math.round(origWordsCount / Math.max(1, sentences.length)));
 
+    // Грамматически безопасное упрощение: сохраняет управление падежей (дат., род., вин.)
     const deAcademize = (s) => {
       let res = String(s || "")
-        .replace(/представляет собой необратимое рассеяние/gi, "поглощает и гасит")
+        .replace(/представляет собой необратимое рассеяние/gi, "— это процесс поглощения и гашения")
         .replace(/представляет собой/gi, "— это")
         .replace(/в отличие от устаревших/gi, "вместо старых")
-        .replace(/приводящий к/gi, "что вызывает")
+        .replace(/приводящ(?:ий|ее|ая|ие)\s+к\b/gi, "что приводит к")
         .replace(/является причиной/gi, "вызывает")
         .replace(/осуществляется посредством/gi, "работает через")
         .replace(/характеризуется наличием/gi, "имеет")
         .replace(/для обеспечения геометрической неизменяемости/gi, "для устойчивости формы")
-        .replace(/ключевой задачей [а-яё\s]+ является/gi, "главная задача —")
+        .replace(/ключевой задачей ([а-яё\s]+) является/gi, "главная задача $1 —")
         .replace(/выступает в качестве/gi, "служит")
         .replace(/\bв\s+рамках\s+данного\s+[а-яё]+\b/gi, "здесь")
         .replace(/\bтаким\s+образом,?\s*/gi, "")
@@ -863,13 +897,12 @@ window.AISupervisorPipeline = {
       return this.capitalizeFirst(res);
     };
 
-    // Делим длинные предложения только по точке с запятой (не вырезая союзы «что/который», чтобы не терять подлежащее!)
     const simplifiedPoints = [];
     sentences.forEach((s) => {
       const plain = deAcademize(s);
       const words = plain.split(/\s+/).filter(Boolean);
-      if (words.length <= 24) {
-        simplifiedPoints.push(this.ensureCompleteSentence(plain, 155));
+      if (words.length <= 26) {
+        simplifiedPoints.push(this.ensureCompleteSentence(plain, 175));
       } else {
         const subParts = plain
           .split(/\s*;\s*/)
@@ -877,10 +910,10 @@ window.AISupervisorPipeline = {
           .filter((p) => p.split(/\s+/).length >= 4);
         if (subParts.length >= 2) {
           subParts.slice(0, 3).forEach((sp) => {
-            simplifiedPoints.push(this.ensureCompleteSentence(this.capitalizeFirst(sp), 150));
+            simplifiedPoints.push(this.ensureCompleteSentence(this.capitalizeFirst(sp), 165));
           });
         } else {
-          simplifiedPoints.push(this.ensureCompleteSentence(plain, 155));
+          simplifiedPoints.push(this.ensureCompleteSentence(plain, 175));
         }
       }
     });
@@ -905,34 +938,24 @@ window.AISupervisorPipeline = {
     const leadTerm = matchedTerms[0] || glossaryList[index % Math.max(1, glossaryList.length)];
     const leadTermName = leadTerm ? leadTerm.term.split(/[/(]/)[0].trim() : title;
     const leadTermPlain = leadTerm ? leadTerm.plain.replace(/[.!?]+$/, "") : "";
+    const lowerPlain = leadTermPlain ? leadTermPlain.charAt(0).toLowerCase() + leadTermPlain.slice(1) : "";
 
-    // 1) Главная мысль без шаблонного префикса «Простыми словами» (на выбранном языке RU / KK / EN)
     const leadSent =
-      simplifiedPoints.find((s) => /— это|дегеніміз|позволяет|помогает|нужно|вызывает|означает|меняет|зависит|allows|enables|means/i.test(s)) ||
+      simplifiedPoints.find((s) => /— это|дегеніміз|позволяет|помогает|нужно|вызывает|приводит|означает|меняет|зависит|allows|enables|means/i.test(s)) ||
       simplifiedPoints[0] ||
       clean;
     const secondSent = simplifiedPoints.find((s) => s !== leadSent && s.length > 24) || "";
-    const coreOpeners = {
-      ru: [
-        (t, p, s) => (p ? `Ключ к разделу — «${t}» (${p}). ${s}` : s),
-        (t, p, s) => (secondSent ? `${s} ${secondSent}` : s),
-        (t, p, s) => (p ? `Главное здесь: ${s} Основа — «${t}» (${p}).` : s)
-      ],
-      kk: [
-        (t, p, s) => (p ? `Бөлімнің өзегі — «${t}» (${p}). ${s}` : s),
-        (t, p, s) => (secondSent ? `${s} ${secondSent}` : s),
-        (t, p, s) => (p ? `Негізгі ой: ${s} Тірегі — «${t}» (${p}).` : s)
-      ],
-      en: [
-        (t, p, s) => (p ? `Core idea: "${t}" (${p}). ${s}` : s),
-        (t, p, s) => (secondSent ? `${s} ${secondSent}` : s),
-        (t, p, s) => (p ? `Key takeaway: ${s} Built around "${t}" (${p}).` : s)
-      ]
-    };
-    const openerPool = coreOpeners[outputLang] || coreOpeners.ru;
-    const coreIdea = openerPool[index % openerPool.length](leadTermName, leadTermPlain, leadSent);
 
-    // 2) Пример или жизненная аналогия (из текста или вариативный пул по домену и индексу)
+    // Избегаем тавтологии (если leadSent уже содержит определение термина, не дублируем его в скобках!)
+    const alreadyExplainsTerm = leadSent.toLowerCase().includes(leadTermName.toLowerCase().slice(0, 6));
+    const coreIdea =
+      outputLang === "kk"
+        ? (secondSent ? `${leadSent} ${secondSent}` : (lowerPlain && !alreadyExplainsTerm ? `«${leadTermName}» (${lowerPlain}): ${leadSent}` : leadSent))
+        : outputLang === "en"
+          ? (secondSent ? `${leadSent} ${secondSent}` : (lowerPlain && !alreadyExplainsTerm ? `Key concept "${leadTermName}" (${lowerPlain}): ${leadSent}` : leadSent))
+          : (secondSent ? `${leadSent} ${secondSent}` : (lowerPlain && !alreadyExplainsTerm ? `В основе раздела — «${leadTermName}» (${lowerPlain}). ${leadSent}` : leadSent));
+
+    // 2) Лаконичная, грамматически целая аналогия (до 135 симв., чтобы не резалась на полуслове)
     const explicitExample = simplifiedPoints.find((s) => /\b(?:например|представим|допустим|на практике|к примеру|мысалы|for example|for instance)\b/i.test(s));
     let analogy = explicitExample || "";
     if (!analogy) {
@@ -940,56 +963,68 @@ window.AISupervisorPipeline = {
       const pools = {
         kk: {
           arch_eng: [
-            `Практикалық мысал: автокөліктегі амортизатор сияқты — «${leadTermName}» соққыны жұмсартып, негізгі қаңқаны сақтайды.`,
-            `Инженерлік бейне: көпір тіректері сияқты — «${leadTermName}» жүктемені біркелкі таратып, артық кернеуді болдырмайды.`
+            `Көлік амортизаторы сияқты: «${leadTermName}» соққыны жұмсартып, негізгі қаңқаны сақтайды.`,
+            `Көпір тіректері сияқты: «${leadTermName}» жүктемені біркелкі таратып, кернеуді азайтады.`,
+            `Серіппелі тірек сияқты: «${leadTermName}» тербелісті өшіріп, ғимаратты тепе-теңдікте ұстайды.`
           ],
           ai_cs: [
-            `Түсінікті бейне: қараңғы кітапханадағы қолшам сияқты — «${leadTermName}» мыңдаған дерек ішінен дәл керек байланысты табады.`,
-            `Күнделікті мысал: ақылды сұрыптау конвейері сияқты — «${leadTermName}» әр қадамда тек маңызды белгілерді сүзіп алады.`
+            `Қараңғы мұрағаттағы прожектор сияқты: «${leadTermName}» мыңдаған дерек ішінен дәл байланысты табады.`,
+            `Сұрыптау конвейері сияқты: «${leadTermName}» артық шуды алып тастап, тек пайдалы сигналды береді.`,
+            `Анықтамалық кітап сөресі сияқты: «${leadTermName}» модельге тексерілген фактіге сүйенуге көмектеседі.`
           ],
           biz_econ: [
-            `Бизнестегі мысал: отбасылық бюджет секілді — «${leadTermName}» барлық шығыннан кейін қанша нақты пайда қалатынын көрсетеді.`,
-            `Экономикалық бейне: дүкен қоймасының айналымы сияқты — «${leadTermName}» ресурстың қай кезеңде жоғалатынын анықтайды.`
+            `Отбасылық бюджет сияқты: «${leadTermName}» барлық шығыннан кейін қанша таза пайда қалатынын көрсетеді.`,
+            `Дүкен қоймасы сияқты: «${leadTermName}» ресурстың қай кезеңде жоғалатынын бірден байқатады.`,
+            `Қаржылық таразы сияқты: «${leadTermName}» табыс пен шығынның теңгерімін дәл есептейді.`
           ],
           soc_hum: [
-            `Өмірлік бейне: қаланы жоғарыдан бақылағандай — «${leadTermName}» жеке әрекеттердің ортақ жүйеге қалай бірігетінін ашады.`,
-            `Көрнекі мысал: оркестр партитурасы сияқты — «${leadTermName}» әртүрлі топтардың өзара үйлесімді ережелерін көрсетеді.`
+            `Қаланы жоғарыдан бақылағандай: «${leadTermName}» жеке әрекеттердің ортақ жүйеге бірігуін көрсетеді.`,
+            `Жол қозғалысы ережесі сияқты: «${leadTermName}» түрлі топтардың өзара әрекетін реттейді.`,
+            `Оркестр партитурасы сияқты: «${leadTermName}» әр қатысушының ортақ үдерістегі рөлін айқындайды.`
           ]
         },
         en: {
           arch_eng: [
-            `Everyday image: like shock absorbers in a car, "${leadTermName}" absorbs sudden peaks so the structure stays intact.`,
-            `Practical comparison: like bridge trusses distributing weight, "${leadTermName}" prevents stress from concentrating at one weak spot.`
+            `Like car shock absorbers, "${leadTermName}" damps sudden impact so the frame stays intact.`,
+            `Like bridge trusses sharing weight, "${leadTermName}" spreads load away from weak joints.`,
+            `Like flexible bearings under a structure, "${leadTermName}" keeps sway smooth and controlled.`
           ],
           ai_cs: [
-            `Analogy: like a spotlight in a dark library, "${leadTermName}" pinpoints the exact context among thousands of tokens.`,
-            `How it works in practice: like a multi-stage sorting belt, "${leadTermName}" filters noise at each layer before output.`
+            `Like a spotlight in a dark archive, "${leadTermName}" highlights the exact facts needed for an answer.`,
+            `Like a sorting conveyor, "${leadTermName}" filters noise at every step and passes clean signals forward.`,
+            `Like an indexed reference library, "${leadTermName}" grounds outputs in verified sources.`
           ],
           biz_econ: [
-            `Business parallel: like a household budget, "${leadTermName}" shows how much net value actually remains after every cost.`,
-            `Market analogy: like checking leaks in a pipeline, "${leadTermName}" reveals where resources convert or drop off.`
+            `Like a household budget, "${leadTermName}" shows how much net value remains after every expense.`,
+            `Like tracking leaks in a pipeline, "${leadTermName}" pinpoints where margin or users drop off.`,
+            `Like a break-even scale, "${leadTermName}" balances recurring revenue against fixed costs.`
           ],
           soc_hum: [
-            `Real-world view: like observing a city from above, "${leadTermName}" reveals how individual habits form shared patterns.`,
-            `Everyday parallel: like rules on a busy intersection, "${leadTermName}" coordinates competing interests into a stable order.`
+            `Like viewing a city from above, "${leadTermName}" reveals how individual habits form shared patterns.`,
+            `Like traffic rules at a busy junction, "${leadTermName}" coordinates different groups without chaos.`,
+            `Like a musical score, "${leadTermName}" connects individual actions into one coherent system.`
           ]
         },
         ru: {
           arch_eng: [
-            `Образ из жизни: представьте амортизатор в автомобиле — «${leadTermName}» гасит резкий импульс, не давая сломаться жёсткой конструкции.`,
-            `Практический образ: как арочный мост распределяет вес, так и «${leadTermName}» переносит нагрузку с одного слабого узла на всю систему.`
+            `Как амортизатор в автомобиле: «${leadTermName}» гасит резкий импульс и бережёт несущий каркас.`,
+            `Как арочный мост распределяет вес, так «${leadTermName}» снимает лишнюю нагрузку со слабых узлов.`,
+            `Как гибкая подушка под фундаментом: «${leadTermName}» переводит жёсткий удар в плавное движение.`
           ],
           ai_cs: [
-            `Аналогия: как прожектор в тёмном архиве — среди тысяч записей «${leadTermName}» подсвечивает именно те связи, от которых зависит точный ответ.`,
-            `Понятный образ: как сортировочный конвейер — на каждом этапе «${leadTermName}» отсекает шум и передаёт дальше только полезный сигнал.`
+            `Как прожектор в тёмном архиве: «${leadTermName}» выделяет среди тысяч записей именно нужные факты.`,
+            `Как сортировочный конвейер: «${leadTermName}» отсекает шум и передаёт дальше точный сигнал.`,
+            `Как проверенный справочник перед ответом: «${leadTermName}» не даёт системе выдумывать факты.`
           ],
           biz_econ: [
-            `Пример из бизнеса: как семейный бюджет — недостаточно просто много зарабатывать, «${leadTermName}» показывает чистый остаток после всех трат.`,
-            `Наглядный образ: как учёт потерь на производстве — «${leadTermName}» сразу подсвечивает этап, где теряется главная доля ресурса.`
+            `Как семейный бюджет: «${leadTermName}» показывает реальный остаток после вычета всех обязательных трат.`,
+            `Как поиск утечек в воронке: «${leadTermName}» подсвечивает шаг, где теряется прибыль.`,
+            `Как точка равновесия на весах: «${leadTermName}» сопоставляет доход с каждого клиента и затраты.`
           ],
           soc_hum: [
-            `Представьте город сверху: отдельные поступки кажутся случайными, но «${leadTermName}» открывает скрытые правила, по которым действуют люди.`,
-            `Жизненная аналогия: как правила дорожного движения на перекрёстке — «${leadTermName}» согласует интересы разных групп без хаоса.`
+            `Как взгляд на город сверху: «${leadTermName}» показывает скрытые правила, объединяющие поступки людей.`,
+            `Как правила движения на перекрёстке: «${leadTermName}» согласует действия разных групп без хаоса.`,
+            `Как партитура оркестра: «${leadTermName}» связывает отдельные роли участников в единый процесс.`
           ]
         }
       };
@@ -998,14 +1033,12 @@ window.AISupervisorPipeline = {
       analogy = domPool[index % domPool.length];
     }
 
-    // 3) Разбор сложных терминов именно этого раздела
     const termBreakdown = matchedTerms.slice(0, 4).map((t) => ({
       id: t.id,
       term: t.term.split(/[/(]/)[0].trim(),
       plain: t.plain
     }));
 
-    // 4) Чистые тезисы без оборванных фрагментов
     const cleanRawBullets = rawBullets
       .map((b) => this.ensureCompleteSentence(deAcademize(b), 145))
       .filter((b) => b.split(/\s+/).length >= 4);
@@ -1023,6 +1056,7 @@ window.AISupervisorPipeline = {
       linkedSceneIndex: index,
       title,
       plainSummary,
+      cleanSentences: simplifiedPoints,
       plainBlocks: {
         coreIdea,
         analogy,
@@ -1516,7 +1550,6 @@ window.AISupervisorPipeline = {
   ensureCompleteSentence(raw, maxChars = 155) {
     let s = String(raw || "").replace(/\s+/g, " ").trim();
     if (!s) return "";
-    // Если фраза не помещается, сначала аккуратно убираем длинные пояснения в скобках целиком
     if (s.length > maxChars) {
       const noParens = s.replace(/\s*\([^)]{8,}\)/g, "").replace(/\s+/g, " ").trim();
       if (noParens.length >= 24) s = noParens;
@@ -1531,13 +1564,13 @@ window.AISupervisorPipeline = {
         s = (lastClause > 55 ? cut.slice(0, lastClause) : cut.replace(/\s+\S*$/, "")).replace(/[,:;—–-]+$/, "").trim();
       }
     }
-    // Убираем висячие предлоги, союзы и обрывки в конце предложения
+    // Убираем висячие предлоги, союзы и обрывки в конце предложения (включая ", но «Термин»")
+    s = s.replace(/,\s*(?:но|а|и|где|когда|что|поэтому)\s+«[^»]{1,40}»$/i, "");
     const danglingRe = /\s+(?:в|во|на|но|и|а|к|с|со|о|об|от|по|до|за|из|под|над|при|для|без|про|через|между|либо|или|как|что|чтобы|если|хотя|также|где|когда|не|ни|который|которая|которое|которые|своего|данной|такой|этого)$/i;
-    for (let k = 0; k < 3; k++) {
+    for (let k = 0; k < 4; k++) {
       if (!danglingRe.test(s)) break;
       s = s.replace(danglingRe, "").replace(/[,:;—–(-]+$/, "").trim();
     }
-    // Убираем незакрытую скобку в конце
     if ((s.match(/\(/g) || []).length > (s.match(/\)/g) || []).length) {
       s = s.replace(/\s*\([^)]*$/, "").trim();
     }
@@ -1648,8 +1681,8 @@ window.AISupervisorPipeline = {
     const globalSignals = this.extractLectureSignals(lectureText, domainProfile, glossary, sections, outputLang);
     const vd = window.LectureVisualDirector;
     const pacing = vd
-      ? vd.estimateComplexityAndPacing(lectureText, glossary.length)
-      : { tier: 2, label: "Стандартный концептуальный", sceneCount: 6, targetCps: 12.0, preRollSec: 0.8, postRollSec: 1.4 };
+      ? vd.estimateComplexityAndPacing(lectureText, glossary.length, sections.length)
+      : { tier: 2, label: "Стандартный концептуальный", sceneCount: Math.max(3, Math.min(6, sections.length + 1)), targetCps: 12.0, preRollSec: 0.8, postRollSec: 1.4 };
 
     const shortCourse = String(courseTitle || "Урок").split("·").pop().trim();
     const scenePlans = vd && typeof vd.selectSectionModules === "function"
@@ -1713,37 +1746,38 @@ window.AISupervisorPipeline = {
       const shortTerm = termObj.term.split(/[/(]/)[0].trim();
       const plainDef = (termObj.plain || "").replace(/[.!?]+$/, "");
 
-      const secSents = String(sec?.plainSummary || sec?.academicOriginal || "")
-        .split(/(?<=[.!?])\s+/)
-        .map((x) => x.trim())
-        .filter((x) => x.length > 16);
+      const secSents = Array.isArray(sec?.cleanSentences) && sec.cleanSentences.length
+        ? sec.cleanSentences
+        : this.splitSentencesSmart(sec?.academicOriginal || "").filter((x) => x.length > 16);
       const secMetrics = this.extractCleanMetrics(sec?.academicOriginal || "");
 
-      const stepWord = outputLang === "kk" ? "Қадам" : outputLang === "en" ? "Step" : "Шаг";
-      const levelWord = outputLang === "kk" ? "Деңгей" : outputLang === "en" ? "Layer" : "Уровень";
       const secBullets = Array.isArray(sec?.plainBullets) ? sec.plainBullets.filter(Boolean) : [];
-      // Подбираем 3–4 реальных элемента из текущего раздела (без копипасты глоссария)
+      // Формируем 3–4 семантически связных элемента (без заглушек «Шаг 01» / «Уровень 1» и без цитат с префиксами)
       const stageItems = [];
       const badStageStartRe = /^(?:хотя|как\s+писал|если|когда|потому|однако|кроме|также|таким\s+образом|позволит|способствует|является)/i;
       if (secBullets.length >= 3) {
         secBullets.slice(0, 4).forEach((b, bIdx) => {
           const g = glossary[(idx + bIdx) % glossary.length];
           const rawHead = b.split(/[:—–-]/)[0].trim();
-          const cleanHead = badStageStartRe.test(rawHead) ? "" : this.shortLabel(rawHead, 28);
+          const cleanHead = !badStageStartRe.test(rawHead) && rawHead.split(/\s+/).length <= 4
+            ? this.shortLabel(rawHead, 26)
+            : "";
           stageItems.push({
-            shortTitle: cleanHead || (g ? this.shortLabel(g.term.split(/[/(]/)[0].trim(), 28) : `${stepWord} ${bIdx + 1}`),
-            detail: this.shortLabel(b, 68),
-            metric: secMetrics[bIdx] || `${stepWord} 0${bIdx + 1}`
+            shortTitle: cleanHead || (g ? this.shortLabel(g.term.split(/[/(]/)[0].trim(), 26) : `${this.shortLabel(sec?.title || shortCourse, 22)}`),
+            detail: this.shortLabel(b, 64),
+            metric: secMetrics[bIdx] || ""
           });
         });
       } else {
         for (let k = 0; k < Math.min(4, Math.max(3, glossary.length)); k++) {
           const g = glossary[(idx + k) % glossary.length] || termObj;
-          const sentFallback = secSents[k] || secBullets[k] || g.plain;
+          const gName = g.term.split(/[/(]/)[0].trim();
+          const gStem = gName.toLowerCase().slice(0, 6);
+          const matchedSent = secSents.find((s) => gStem.length >= 3 && s.toLowerCase().includes(gStem));
           stageItems.push({
-            shortTitle: this.shortLabel(g.term.split(/[/(]/)[0].trim(), 28),
-            detail: this.shortLabel(sentFallback, 68),
-            metric: secMetrics[k] || `${levelWord} ${k + 1}`
+            shortTitle: this.shortLabel(gName, 26),
+            detail: this.shortLabel(matchedSent || g.plain || secBullets[k] || "", 64),
+            metric: secMetrics[k] || ""
           });
         }
       }
@@ -1880,11 +1914,11 @@ window.AISupervisorPipeline = {
       } else {
         sceneTitle = pickSceneTitle(sec?.title, meta.title, shortTerm);
         b0 = pickUnique(
-          [secSents[0], secBullets[0], `В фокусе раздела — «${stepLbl}»: ${stageItems[0]?.detail || plainDef}.`],
+          [secSents[0], secBullets[0], `В фокусе раздела — «${stepLbl}»: ${plainDef}.`],
           `Ключевой элемент раздела — «${stepLbl}».`
         );
         b1 = pickUnique(
-          [secSents[1], secBullets[1], `С ним напрямую связано звено «${stepLbl2}»: ${stageItems[1]?.detail || plainDef}.`],
+          [secSents[1], secBullets[1], `С ним напрямую связано звено «${stepLbl2}», раскрывающее механизм темы.`],
           `Далее включается «${stepLbl2}», уточняя механизм.`
         );
         b2 = pickUnique(
@@ -2128,7 +2162,7 @@ export const LectureComposition: React.FC = () => (
   },
 
   async computeContentHash(courseTitle, glossaryText, lectureText, outputLang = "ru") {
-    const raw = `v11_coherent||${outputLang}||${courseTitle.trim()}||${glossaryText.trim()}||${lectureText.trim()}`;
+    const raw = `v12_modern_clean||${outputLang}||${courseTitle.trim()}||${glossaryText.trim()}||${lectureText.trim()}`;
     if (window.crypto && window.crypto.subtle) {
       const buf = new TextEncoder().encode(raw);
       const digest = await window.crypto.subtle.digest("SHA-256", buf);
@@ -2161,10 +2195,10 @@ export const LectureComposition: React.FC = () => (
     (pkg.glossary || []).forEach((g) => {
       const origTerm = g.term;
       pushSlot(g.term, (v) => {
-        // Сохраняем оригинальный термин в скобках для сдачи экзамена, если он отличается
         const cleanOrig = origTerm.split(/[/(]/)[0].trim();
-        g.term = v.toLowerCase() === cleanOrig.toLowerCase() ? v : `${v} (${cleanOrig})`;
-        const { dactylBoxes, signHint } = this.buildDactylAndSignHint(v);
+        const cleanTranslated = v.split(/[/(]/)[0].trim();
+        g.term = cleanTranslated.toLowerCase() === cleanOrig.toLowerCase() ? cleanTranslated : `${cleanTranslated} (${cleanOrig})`;
+        const { dactylBoxes, signHint } = this.buildDactylAndSignHint(cleanTranslated);
         g.dactylBoxes = dactylBoxes;
         g.signHint = signHint;
       });
@@ -2313,6 +2347,20 @@ export const LectureComposition: React.FC = () => (
     const domainProfile = this.detectDomainProfile(cleanTitle, segmented.coreText, glossaryText);
     let glossary = this.parseGlossary(glossaryText, cleanText, segmented.embeddedGlossaryLines);
     const sections = segmented.blocks.map((b, idx) => this.simplifyToPlainLanguage(b, glossary, idx, domainProfile, outputLang));
+    const seenSecTitles = new Set();
+    sections.forEach((sec, idx) => {
+      const low = String(sec.title || "").trim().toLowerCase();
+      if (low && seenSecTitles.has(low)) {
+        const altWords = (sec.cleanSentences?.[0] || sec.academicOriginal || "")
+          .replace(/^[«"—–-\s]+/, "")
+          .split(/\s+/)
+          .slice(0, 4)
+          .join(" ")
+          .replace(/[,:;—–\-.!?]+$/, "");
+        sec.title = altWords.length > 6 ? this.capitalizeFirst(altWords) : `${sec.title} · Часть ${idx + 1}`;
+      }
+      seenSecTitles.add(String(sec.title || "").trim().toLowerCase());
+    });
     let storyboardOut = this.buildStoryboardAndSupervise(cleanTitle, sections, glossary, segmented.coreText, outputLang, glossaryText);
     sections.forEach((sec, idx) => {
       sec.linkedSceneIndex = Math.min(storyboardOut.scenes.length - 1, idx);
@@ -2332,6 +2380,7 @@ export const LectureComposition: React.FC = () => (
     const targetQuizCount = quiz.length;
 
     let usedCloudModel = false;
+    const pipelineWarnings = [];
     if (geminiApiKey && geminiApiKey.trim().startsWith("AIza")) {
       const langNames = {
         ru: "Russian (Русский)",
@@ -2628,9 +2677,20 @@ ${segmented.coreText.slice(0, 9000)}`
             }
             usedCloudModel = true;
           }
+        } else {
+          const errBody = await resp.text().catch(() => "");
+          pipelineWarnings.push(
+            resp.status === 400 || resp.status === 403
+              ? "Ключ Gemini API отклонён (400/403). Проверьте ключ в меню «🔑 ИИ» — работает автономный режим."
+              : resp.status === 429
+                ? "Лимит запросов Gemini API исчерпан (429). Сценарий собран автономным модулем."
+                : `Облачный ИИ Gemini вернул ошибку HTTP ${resp.status}. Работает автономный модуль.`
+          );
+          console.warn("Gemini API HTTP error:", resp.status, errBody.slice(0, 180));
         }
       } catch (e) {
         if (e?.name === "AbortError" && abortSignal?.aborted) throw e;
+        pipelineWarnings.push("Не удалось связаться с Gemini API (таймаут или нет сети) — использован встроенный сценарист.");
         console.warn("Gemini API fallback to universal deterministic scriptwriter:", e);
       }
     }
@@ -2662,11 +2722,15 @@ ${segmented.coreText.slice(0, 9000)}`
       fullQuizCount: quiz.length,
       scenes: storyboardOut.scenes,
       supervisorLogs: storyboardOut.supervisorLogs,
-      generatedCode: storyboardOut.generatedCode
+      generatedCode: storyboardOut.generatedCode,
+      warnings: pipelineWarnings
     };
 
     if (!usedCloudModel && outputLang !== sourceLang) {
-      await this.translatePackageViaServer(pkgOut, sourceLang, outputLang, domainProfile, abortSignal);
+      const trRes = await this.translatePackageViaServer(pkgOut, sourceLang, outputLang, domainProfile, abortSignal);
+      if (trRes && trRes.translated === false) {
+        pipelineWarnings.push("Сервер перевода недоступен — часть текста осталась на языке оригинала.");
+      }
       const finTranslated = this.finalizeStoryboardLogsAndCode(
         pkgOut.courseTitle,
         domainProfile,

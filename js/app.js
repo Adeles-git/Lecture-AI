@@ -85,7 +85,7 @@
     outputLang: "ru",
     voiceGender: "female",
     deafFirstMode: false,
-    notesMode: "dual",
+    notesMode: "ready",
     glossaryQuery: "",
     flashcardsOpen: false,
     flashcardIdx: 0,
@@ -107,6 +107,10 @@
     animEngine: null,
     liveRecognition: null,
     isLiveRecording: false,
+    liveSessionStatus: "idle",
+    liveFinalizedHtml: "",
+    liveElapsedSec: 0,
+    liveElapsedTimer: null,
     micStream: null,
     micVadTimer: null,
     simTimers: [],
@@ -140,6 +144,19 @@
     initMobileUX();
 
     updateTokenBadge();
+
+    // Глобальный перехватчик неожиданных ошибок и отказавших промисов с понятным уведомлением
+    window.addEventListener("error", (ev) => {
+      if (ev?.message && !/ResizeObserver/i.test(ev.message)) {
+        showFlashToast(`Системная ошибка: ${ev.message}`, "error");
+      }
+    });
+    window.addEventListener("unhandledrejection", (ev) => {
+      const reason = ev?.reason;
+      if (reason?.name === "AbortError") return;
+      const msg = reason?.message || String(reason || "Неизвестный сбой операции");
+      showFlashToast(`Сбой операции: ${msg}`, "error");
+    });
   });
 
   // Загрузка и сохранение персистентного состояния
@@ -238,14 +255,47 @@
     safeSet(STORAGE_KEYS.HISTORY, JSON.stringify(state.history.filter((h) => !h._remoteOnly).slice(0, 8)));
   }
 
-  // Световой Flash-Toast для глухих студентов (вместо звуковых сигналов и блокирующих alert)
-  function showFlashToast(message, type = "info") {
-    const toast = document.getElementById("flashToast");
-    toast.textContent = message;
-    toast.style.borderColor = type === "success" ? "#15803d" : type === "warn" ? "#b45309" : "#0f766e";
-    toast.classList.remove("hidden");
-    clearTimeout(toast._timer);
-    toast._timer = setTimeout(() => toast.classList.add("hidden"), 3400);
+  // Световой Toast-стек для глухих и слышащих студентов (error / warn / info / success с закрытием ✕)
+  const _recentToastMap = new Map();
+  function showFlashToast(message, type = "info", opts = {}) {
+    const cleanMsg = String(message || "").trim();
+    if (!cleanMsg) return;
+    const now = Date.now();
+    const dedupKey = `${type}:${cleanMsg}`;
+    if (!opts.force && now - (_recentToastMap.get(dedupKey) || 0) < 2200) return;
+    _recentToastMap.set(dedupKey, now);
+
+    const stack = document.getElementById("toastStack");
+    const legacyToast = document.getElementById("flashToast");
+    const labels = { error: "Ошибка:", warn: "Внимание:", success: "Готово:", info: "" };
+    const duration = opts.durationMs || (type === "error" ? 6500 : type === "warn" ? 4800 : 3400);
+    const prefix = labels[type] ? `<strong>${labels[type]}</strong> ` : "";
+
+    if (!stack) {
+      if (!legacyToast) return;
+      legacyToast.innerHTML = `${prefix}${escapeHtml(cleanMsg)}`;
+      legacyToast.className = `flash-toast toast-${type}`;
+      clearTimeout(legacyToast._timer);
+      legacyToast._timer = setTimeout(() => legacyToast.classList.add("hidden"), duration);
+      return;
+    }
+
+    if (legacyToast) legacyToast.classList.add("hidden");
+    while (stack.querySelectorAll(".flash-toast:not(#flashToast)").length >= 3) {
+      stack.querySelector(".flash-toast:not(#flashToast)")?.remove();
+    }
+
+    const item = document.createElement("div");
+    item.className = `flash-toast toast-${type}`;
+    item.setAttribute("role", type === "error" ? "alert" : "status");
+    item.innerHTML = `<span>${prefix}${escapeHtml(cleanMsg)}</span><button type="button" class="toast-close-btn" aria-label="Закрыть уведомление">✕</button>`;
+    const removeItem = () => {
+      clearTimeout(item._timer);
+      item.remove();
+    };
+    item.querySelector(".toast-close-btn")?.addEventListener("click", removeItem);
+    stack.appendChild(item);
+    item._timer = setTimeout(removeItem, duration);
   }
 
   // 1. Настройки доступности (A / A+ / A++ / WCAG AAA Контраст) с сохранением в localStorage
@@ -284,18 +334,52 @@
         ) || "btnFontNormal";
       const sc = activeFontBtn === "btnFontLarge" ? 1.15 : activeFontBtn === "btnFontXLarge" ? 1.3 : 1;
       applyA11y(sc, activeFontBtn, nextC);
+      if (state.pipelineResult) {
+        renderTwoLevelMindMapSVG(state.pipelineResult);
+      }
     });
   }
 
-  // 2. Сворачивание левой панели, витрина 4 пресетов и режим Deaf-First
+  // 2. Сворачивание левой панели, выпадающее Меню, Примеры курсов и режим без озвучки
   function initSidebarAndPresets() {
     document.getElementById("btnToggleSidebar").addEventListener("click", () => {
       document.getElementById("studioWorkspace").classList.toggle("sidebar-collapsed");
     });
 
+    const btnTopMenu = document.getElementById("btnToggleTopMenu");
+    const topDropdown = document.getElementById("topToolsDropdown");
+    if (btnTopMenu && topDropdown) {
+      btnTopMenu.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const isOpen = !topDropdown.classList.contains("hidden");
+        topDropdown.classList.toggle("hidden", isOpen);
+        btnTopMenu.setAttribute("aria-expanded", isOpen ? "false" : "true");
+      });
+      topDropdown.addEventListener("click", () => {
+        topDropdown.classList.add("hidden");
+        btnTopMenu.setAttribute("aria-expanded", "false");
+      });
+      document.addEventListener("click", () => {
+        topDropdown.classList.add("hidden");
+        btnTopMenu.setAttribute("aria-expanded", "false");
+      });
+    }
+
+    const presetsModal = document.getElementById("presetsModal");
+    document.getElementById("btnOpenPresetsModal")?.addEventListener("click", () => {
+      presetsModal?.classList.remove("hidden");
+    });
+    document.getElementById("btnClosePresetsModal")?.addEventListener("click", () => {
+      presetsModal?.classList.add("hidden");
+    });
+    presetsModal?.addEventListener("click", (e) => {
+      if (e.target === presetsModal) presetsModal.classList.add("hidden");
+    });
+
     document.querySelectorAll("[data-preset-key]").forEach((btn) => {
       btn.addEventListener("click", () => {
         if (state.isRunning) return;
+        presetsModal?.classList.add("hidden");
         const key = btn.getAttribute("data-preset-key") || "arch";
         if (key === "kz" && state.outputLang !== "kk") {
           const kkBtn = document.querySelector('#outputLangSwitch .btn-lang[data-lang="kk"]');
@@ -337,7 +421,7 @@
                 state.animEngine.setTtsEnabled(true);
                 updateAudioStreamBadge({ readyCount: state.animEngine.scenes.length, totalScenes: state.animEngine.scenes.length, mode: "neural", done: true });
                 const btnTts = document.getElementById("btnToggleTts");
-                if (btnTts) btnTts.textContent = "🔊 Озвучка: ВКЛ";
+                if (btnTts) btnTts.textContent = "Выключить озвучку";
                 if (wasPlay) state.animEngine.play();
               })
               .catch(() => {
@@ -346,7 +430,7 @@
           } else {
             state.animEngine.setTtsEnabled(!state.deafFirstMode);
             const btnTts = document.getElementById("btnToggleTts");
-            if (btnTts) btnTts.textContent = state.animEngine.ttsEnabled ? "🔊 Озвучка: ВКЛ" : "🔇 Озвучка: ВЫКЛ";
+            if (btnTts) btnTts.textContent = state.animEngine.ttsEnabled ? "Выключить озвучку" : "Включить озвучку";
           }
         }
       });
@@ -404,8 +488,12 @@
     document.getElementById("lectureTextInput").value = "";
     document.getElementById("glossaryInput").value = "";
     document.getElementById("uploadedFilesList").innerHTML = "";
-    document.getElementById("liveCaptionsScreen").innerHTML =
-      '<div class="live-placeholder">Нажмите «Включить микрофон» или «Демо речи»...</div>';
+    if (typeof state._resetLiveSession === "function") {
+      state._resetLiveSession();
+    } else {
+      document.getElementById("liveCaptionsScreen").innerHTML =
+        '<div class="live-placeholder">Нажмите «Начать запись» или «Демо речи»...</div>';
+    }
     updateTokenBadge();
 
     document.getElementById("resultsContentWrap").classList.add("hidden");
@@ -583,16 +671,32 @@
 
     const extractedChunks = [];
     for (const file of files) {
-      const name = file.name.toLowerCase();
-      if (name.endsWith(".txt") || name.endsWith(".md") || name.endsWith(".csv") || name.endsWith(".json")) {
-        const txt = await file.text();
-        extractedChunks.push(txt.trim());
-      } else if (name.endsWith(".mp3") || name.endsWith(".wav") || name.endsWith(".m4a") || name.endsWith(".webm")) {
-        const audioTxt = await transcribeAudioWithGroqOrFallback(file);
-        extractedChunks.push(audioTxt);
-      } else {
-        const extracted = await extractBinaryDocumentText(file);
-        extractedChunks.push(extracted);
+      if (file.size > 15 * 1024 * 1024) {
+        showFlashToast(`Файл «${file.name}» превышает лимит 15 МБ и пропущен.`, "error");
+        continue;
+      }
+      if (file.size === 0) {
+        showFlashToast(`Файл «${file.name}» пустой (0 байт).`, "warn");
+        continue;
+      }
+      try {
+        const name = file.name.toLowerCase();
+        if (name.endsWith(".txt") || name.endsWith(".md") || name.endsWith(".csv") || name.endsWith(".json")) {
+          const txt = await file.text();
+          if (!txt.trim()) {
+            showFlashToast(`Текстовый файл «${file.name}» не содержит текста.`, "warn");
+          } else {
+            extractedChunks.push(txt.trim());
+          }
+        } else if (name.endsWith(".mp3") || name.endsWith(".wav") || name.endsWith(".m4a") || name.endsWith(".webm")) {
+          const audioTxt = await transcribeAudioWithGroqOrFallback(file);
+          extractedChunks.push(audioTxt);
+        } else {
+          const extracted = await extractBinaryDocumentText(file);
+          extractedChunks.push(extracted);
+        }
+      } catch (err) {
+        showFlashToast(`Не удалось прочитать файл «${file.name}»: ${err?.message || "ошибка чтения"}`, "error");
       }
     }
 
@@ -604,6 +708,11 @@
       );
       document.getElementById("courseTitleInput").value = meta.cleanTitle;
       document.getElementById("lectureTextInput").value = meta.cleanText;
+      const hasGlossaryFile = Array.from(files).some((f) => /glossar|словар|термин/i.test(f.name || ""));
+      if (!hasGlossaryFile) {
+        const glossEl = document.getElementById("glossaryInput");
+        if (glossEl) glossEl.value = "";
+      }
       updateTokenBadge();
       showFlashToast(`Загружено файлов: ${files.length}. Нажмите «Создать учебный пакет →»!`, "success");
     }
@@ -624,8 +733,14 @@
         if (resp.ok) {
           const data = await resp.json();
           if (data.text) return data.text.trim();
+        } else {
+          showFlashToast(`Groq Whisper вернул ошибку HTTP ${resp.status} при расшифровке «${file.name}».`, "warn");
         }
-      } catch (_) {}
+      } catch (_) {
+        showFlashToast(`Ошибка сети при расшифровке аудио «${file.name}» через Groq.`, "warn");
+      }
+    } else {
+      showFlashToast("Для расшифровки аудиофайлов укажите бесплатный ключ Groq в меню «🔑 ИИ».", "info");
     }
     return `Аудиофайл «${file.name}» принят в обработку. (Для облачной расшифровки аудиофайлов можно указать бесплатный ключ Groq Whisper в меню «🔑 ИИ» или использовать микрофон во вкладке «Живая речь»).`;
   }
@@ -782,58 +897,42 @@
     if (readable && readable.length > 0) {
       return readable.join(" ").slice(0, 6000);
     }
+    showFlashToast(`Не удалось извлечь текст из «${file.name}» (возможно, скан без текстового слоя). Вставьте текст вручную или укажите ключ Gemini.`, "warn");
     return `Документ «${file.name}» загружен в базу курса для построения конспекта, схемы, теста и 2D видео-анимации.`;
   }
 
-  // 5. Режим «Live-пара» (реальный микрофон без дублирования + живая Fuzzy-коррекция терминов по глоссарию)
+  // 5. Режим «Живая речь» (пауза / продолжение той же записи / новая запись + автокоррекция терминов)
   function initLiveCaptions() {
     const btnStart = document.getElementById("btnStartLive");
     const btnSim = document.getElementById("btnSimulateLive");
+    const btnReset = document.getElementById("btnResetLive");
+    const liveBox = document.getElementById("liveBox");
     const screen = document.getElementById("liveCaptionsScreen");
 
-    btnSim.addEventListener("click", () => {
+    const syncLiveUi = () => {
+      const st = state.liveSessionStatus || "idle";
+      if (liveBox) {
+        liveBox.classList.toggle("is-recording", st === "recording");
+        liveBox.classList.toggle("is-paused", st === "paused");
+      }
+      if (btnStart) {
+        btnStart.textContent =
+          st === "recording" ? "Пауза" : st === "paused" ? "Продолжить запись" : "Начать запись";
+      }
+      if (btnReset) {
+        const hasSession = st !== "idle" || Boolean(state.liveFinalizedHtml);
+        btnReset.classList.toggle("hidden", !hasSession);
+      }
+    };
+
+    const stopLiveTimers = () => {
+      if (state.liveElapsedTimer) {
+        clearInterval(state.liveElapsedTimer);
+        state.liveElapsedTimer = null;
+      }
       state.simTimers.forEach(clearTimeout);
       state.simTimers = [];
-
-      const phrases = window.LIVE_SIMULATION_PHRASES[state.currentPreset] || window.LIVE_SIMULATION_PHRASES.arch;
-      screen.innerHTML = "";
-      state.correctedTermsCount = 0;
-      state.silenceSavedSec = 0;
-
-      phrases.forEach((item, idx) => {
-        const tId = setTimeout(() => {
-          document.getElementById("vadStatus").textContent = "VAD: Речь лектора";
-          document.getElementById("vadFill").style.width = `${68 + (idx % 3) * 10}%`;
-          state.correctedTermsCount += 1;
-          state.silenceSavedSec += 4;
-          document.getElementById("vadStats").textContent =
-            `Тишина отсечена: ${state.silenceSavedSec} сек · Исправлено терминов по силлабусу: ${state.correctedTermsCount}`;
-
-          const p = document.createElement("div");
-          p.style.marginBottom = "10px";
-          const safeRaw = escapeHtml(item.raw);
-          const safeWrong = escapeHtml(item.wrongTerm);
-          const safeCorr = escapeHtml(item.correctedTerm);
-          const highlighted = safeRaw.replace(
-            safeWrong,
-            `<span class="corrected-chip" title="Автокоррекция по глоссарию силлабуса (было: ${safeWrong})">✓ ${safeCorr}</span>`
-          );
-          p.innerHTML = `<span style="color:#38bdf8;font-weight:700;">[00:0${idx + 1}:12]</span> ${highlighted}`;
-          screen.appendChild(p);
-          screen.scrollTop = screen.scrollHeight;
-
-          if (idx === phrases.length - 1) {
-            const endTimer = setTimeout(() => {
-              document.getElementById("vadStatus").textContent = "VAD: Пауза (0 токенов)";
-              document.getElementById("vadFill").style.width = "6%";
-              showFlashToast("Живая речь распознана: исправлено 3 профильных термина по силлабусу!", "success");
-            }, 900);
-            state.simTimers.push(endTimer);
-          }
-        }, idx * 1050);
-        state.simTimers.push(tId);
-      });
-    });
+    };
 
     const stopMicVadMeter = () => {
       if (state.micVadTimer) {
@@ -845,6 +944,99 @@
         state.micStream = null;
       }
     };
+
+    const resetLiveSession = () => {
+      state.isLiveRecording = false;
+      state.liveSessionStatus = "idle";
+      stopLiveTimers();
+      stopMicVadMeter();
+      if (state.liveRecognition) {
+        try { state.liveRecognition.stop(); } catch (_) {}
+        state.liveRecognition = null;
+      }
+      state.liveFinalizedHtml = "";
+      state.liveElapsedSec = 0;
+      state.correctedTermsCount = 0;
+      state.silenceSavedSec = 0;
+      if (screen) {
+        screen.innerHTML = '<div class="live-placeholder">Нажмите «Начать запись» или «Демо речи»...</div>';
+      }
+      const vadStatus = document.getElementById("vadStatus");
+      const vadFill = document.getElementById("vadFill");
+      const vadStats = document.getElementById("vadStats");
+      if (vadStatus) vadStatus.textContent = "Готов";
+      if (vadFill) vadFill.style.width = "0%";
+      if (vadStats) vadStats.textContent = "Тишина отсечена: 0 с · Исправлено: 0";
+      syncLiveUi();
+    };
+    state._resetLiveSession = resetLiveSession;
+
+    if (btnReset) {
+      btnReset.addEventListener("click", () => {
+        resetLiveSession();
+        showFlashToast("Запись очищена. Можно начать новую лекцию.", "info");
+      });
+    }
+
+    btnSim.addEventListener("click", () => {
+      if (state.isLiveRecording) {
+        state.isLiveRecording = false;
+        if (state.liveRecognition) {
+          try { state.liveRecognition.stop(); } catch (_) {}
+        }
+        stopMicVadMeter();
+      }
+      stopLiveTimers();
+      state.liveSessionStatus = "recording";
+      syncLiveUi();
+
+      const phrases = window.LIVE_SIMULATION_PHRASES[state.currentPreset] || window.LIVE_SIMULATION_PHRASES.arch;
+      if (!state.liveFinalizedHtml) {
+        screen.innerHTML = "";
+      }
+
+      phrases.forEach((item, idx) => {
+        const tId = setTimeout(() => {
+          state.liveElapsedSec += 4;
+          document.getElementById("vadStatus").textContent = "Идёт запись речи";
+          document.getElementById("vadFill").style.width = `${68 + (idx % 3) * 10}%`;
+          state.correctedTermsCount += 1;
+          state.silenceSavedSec += 4;
+          document.getElementById("vadStats").textContent =
+            `Тишина отсечена: ${Math.floor(state.silenceSavedSec)} с · Исправлено терминов: ${state.correctedTermsCount}`;
+
+          const safeRaw = escapeHtml(item.raw);
+          const safeWrong = escapeHtml(item.wrongTerm);
+          const safeCorr = escapeHtml(item.correctedTerm);
+          const highlighted = safeRaw.replace(
+            safeWrong,
+            `<span class="corrected-chip" title="Автокоррекция термина (было: ${safeWrong})">${safeCorr}</span>`
+          );
+          const lineHtml = `<div class="live-line-item"><span style="color:var(--primary);font-weight:700;">[${formatTime(state.liveElapsedSec)}]</span> ${highlighted}</div>`;
+          state.liveFinalizedHtml += lineHtml;
+          screen.innerHTML = state.liveFinalizedHtml;
+          screen.scrollTop = screen.scrollHeight;
+
+          const lecInp = document.getElementById("lectureTextInput");
+          if (lecInp) {
+            lecInp.value = (lecInp.value ? lecInp.value.trimEnd() + "\n" : "") + item.raw.replace(item.wrongTerm, item.correctedTerm);
+            updateTokenBadge();
+          }
+
+          if (idx === phrases.length - 1) {
+            const endTimer = setTimeout(() => {
+              state.liveSessionStatus = "paused";
+              document.getElementById("vadStatus").textContent = "На паузе — можно продолжить";
+              document.getElementById("vadFill").style.width = "6%";
+              syncLiveUi();
+              showFlashToast("Фрагмент записан. Нажмите «Продолжить запись» или «Создать учебный пакет».", "success");
+            }, 700);
+            state.simTimers.push(endTimer);
+          }
+        }, idx * 950);
+        state.simTimers.push(tId);
+      });
+    });
 
     const startMicVadMeter = async () => {
       stopMicVadMeter();
@@ -882,7 +1074,7 @@
             state.silenceSavedSec = +(state.silenceSavedSec + 0.25).toFixed(1);
           }
           document.getElementById("vadFill").style.width = `${levelPct}%`;
-          document.getElementById("vadStatus").textContent = isSpeech ? "VAD: Речь лектора" : "VAD: Тишина (отсечена)";
+          document.getElementById("vadStatus").textContent = isSpeech ? "Идёт запись речи" : "Тишина (отсечена)";
           document.getElementById("vadStats").textContent =
             `Тишина отсечена: ${Math.floor(state.silenceSavedSec)} с · Исправлено: ${state.correctedTermsCount}`;
         }, 250);
@@ -892,28 +1084,52 @@
     btnStart.addEventListener("click", () => {
       const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
       if (!SpeechRec) {
+        if (state.liveSessionStatus === "recording") {
+          stopLiveTimers();
+          state.liveSessionStatus = "paused";
+          document.getElementById("vadStatus").textContent = "На паузе — можно продолжить";
+          document.getElementById("vadFill").style.width = "0%";
+          syncLiveUi();
+          return;
+        }
         btnSim.click();
         return;
       }
+
+      // Пауза с сохранением всей текущей записи
       if (state.isLiveRecording && state.liveRecognition) {
         state.isLiveRecording = false;
+        state.liveSessionStatus = "paused";
+        stopLiveTimers();
         stopMicVadMeter();
         try { state.liveRecognition.stop(); } catch (_) {}
-        btnStart.textContent = "▶ Включить микрофон";
-        document.getElementById("vadStatus").textContent = "Готов";
+        document.getElementById("vadStatus").textContent = "На паузе — можно продолжить";
         document.getElementById("vadFill").style.width = "0%";
+        syncLiveUi();
         return;
       }
 
+      // Старт или продолжение существующей сессии записи
       const rec = new SpeechRec();
       rec.lang = document.getElementById("liveLangSelect").value || "ru-RU";
       rec.continuous = true;
       rec.interimResults = true;
       state.liveRecognition = rec;
       state.isLiveRecording = true;
-      state.silenceSavedSec = 0;
-      btnStart.textContent = "⏹ Стоп";
-      screen.innerHTML = "";
+      state.liveSessionStatus = "recording";
+      syncLiveUi();
+
+      if (!state.liveFinalizedHtml) {
+        screen.innerHTML = "";
+      } else {
+        screen.innerHTML = state.liveFinalizedHtml;
+        screen.scrollTop = screen.scrollHeight;
+      }
+
+      if (state.liveElapsedTimer) clearInterval(state.liveElapsedTimer);
+      state.liveElapsedTimer = setInterval(() => {
+        if (state.isLiveRecording) state.liveElapsedSec += 1;
+      }, 1000);
       startMicVadMeter();
 
       const glossaryList = window.AISupervisorPipeline.parseGlossary(
@@ -921,7 +1137,6 @@
         document.getElementById("lectureTextInput").value
       );
 
-      let finalizedHtml = "";
       rec.onresult = (event) => {
         let interim = "";
         for (let i = event.resultIndex; i < event.results.length; i++) {
@@ -929,26 +1144,29 @@
           if (event.results[i].isFinal) {
             const corr = window.AISupervisorPipeline.correctTranscriptWithGlossary(escapeHtml(chunk), glossaryList);
             state.correctedTermsCount += corr.replacementsCount;
-            finalizedHtml += `<div style="margin-bottom:8px;"><span style="color:#4ade80;font-weight:700;">[Live]</span> ${corr.correctedHtml}</div>`;
-            document.getElementById("lectureTextInput").value += "\n" + chunk.trim();
-            updateTokenBadge();
+            state.liveFinalizedHtml += `<div class="live-line-item"><span style="color:var(--primary);font-weight:700;">[${formatTime(state.liveElapsedSec)}]</span> ${corr.correctedHtml}</div>`;
+            const lecInp = document.getElementById("lectureTextInput");
+            if (lecInp) {
+              lecInp.value = (lecInp.value ? lecInp.value.trimEnd() + "\n" : "") + chunk.trim();
+              updateTokenBadge();
+            }
           } else {
             interim += chunk;
           }
         }
         if (!state.micVadTimer) {
-          document.getElementById("vadStatus").textContent = "VAD: Активный микрофон";
+          document.getElementById("vadStatus").textContent = "Идёт запись речи";
           document.getElementById("vadFill").style.width = "74%";
         }
         document.getElementById("vadStats").textContent =
           `Тишина отсечена: ${Math.floor(state.silenceSavedSec)} с · Исправлено: ${state.correctedTermsCount}`;
         screen.innerHTML =
-          finalizedHtml +
-          (interim ? `<div style="color:#94a3b8;font-style:italic;">${escapeHtml(interim)}...</div>` : "");
+          state.liveFinalizedHtml +
+          (interim ? `<div style="color:var(--text-muted);font-style:italic;">${escapeHtml(interim)}...</div>` : "");
         screen.scrollTop = screen.scrollHeight;
       };
 
-      // Авто-рестарт при длинных паузах лектора, чтобы микрофон не обрывался посреди пары!
+      // Авто-рестарт при длинных паузах лектора, чтобы микрофон не обрывался посреди пары
       rec.onend = () => {
         if (state.isLiveRecording) {
           setTimeout(() => {
@@ -957,21 +1175,26 @@
               rec.start();
             } catch (_) {
               state.isLiveRecording = false;
+              state.liveSessionStatus = state.liveFinalizedHtml ? "paused" : "idle";
+              stopLiveTimers();
               stopMicVadMeter();
-              btnStart.textContent = "▶ Включить микрофон";
+              syncLiveUi();
             }
           }, 220);
         } else {
+          stopLiveTimers();
           stopMicVadMeter();
-          btnStart.textContent = "▶ Включить микрофон";
+          syncLiveUi();
         }
       };
 
       rec.onerror = (ev) => {
         if (ev?.error === "not-allowed" || ev?.error === "service-not-allowed") {
           state.isLiveRecording = false;
+          state.liveSessionStatus = state.liveFinalizedHtml ? "paused" : "idle";
+          stopLiveTimers();
           stopMicVadMeter();
-          btnStart.textContent = "▶ Включить микрофон";
+          syncLiveUi();
           showFlashToast("Доступ к микрофону запрещён браузером. Включаю демо речи.", "warn");
           btnSim.click();
         }
@@ -980,10 +1203,14 @@
         rec.start();
       } catch (_) {
         state.isLiveRecording = false;
+        state.liveSessionStatus = state.liveFinalizedHtml ? "paused" : "idle";
+        stopLiveTimers();
         stopMicVadMeter();
-        btnStart.textContent = "▶ Включить микрофон";
+        syncLiveUi();
       }
     });
+
+    syncLiveUi();
   }
 
   // Блокировка всех контролов плеера и скачивания видео до 100% готовности сцен и звука
@@ -1121,7 +1348,7 @@
         supText: "Подготовка голосовой дорожки",
         etaText: "Осталось ~4–8 сек"
       });
-      await state.animEngine.pregenerateAllSceneAudio(
+      const ttsRes = await state.animEngine.pregenerateAllSceneAudio(
         state.animEngine.scenes,
         ttsLocale,
         (prog) => {
@@ -1146,10 +1373,15 @@
       }
       state.animEngine.recalcTotalDuration();
       result.scenes = state.animEngine.scenes.map((s) => ({ ...s, audioBuffer: undefined }));
+      if (ttsRes?.backendMode !== "neural_buffer") {
+        showFlashToast("Сервер нейронной озвучки недоступен — включён резервный режим субтитров/браузера.", "warn");
+      } else if (ttsRes?.failedScenesCount > 0) {
+        showFlashToast(`Не удалось озвучить сцен: ${ttsRes.failedScenesCount} из ${totalScenes}. Для них показаны субтитры.`, "warn");
+      }
       updateGenerationProgressUI({
         pct: 100,
         activeStep: 4,
-        title: "Готово! Запускаем 2D-мультфильм со звуком...",
+        title: "Готово! Нажмите ▶ Играть для запуска видео",
         sub: "Все сцены и студийная озвучка готовы на 100%.",
         sceneText: `Готово · ${totalScenes} из ${totalScenes}`,
         supText: "Озвучка 100% готова",
@@ -1162,16 +1394,23 @@
 
     renderResultsAll(result, isCacheHit);
     setPlayerControlsLocked(false);
-    state.animEngine.activateReadyStoryboard({ autoPlay: true, enableTts: wantAudio });
+    // Видео после генерации ВСЕГДА открывается на стопе с постер-кадром 1-й сцены
+    state.animEngine.activateReadyStoryboard({ autoPlay: false, enableTts: wantAudio });
     if (typeof window !== "undefined" && window.innerWidth <= 900) {
       setMobileSection("animation");
     }
 
     const btnPlayPause = document.getElementById("btnPlayPause");
-    if (btnPlayPause) btnPlayPause.textContent = "⏸ Пауза";
+    if (btnPlayPause) btnPlayPause.textContent = "Играть";
+    document.getElementById("stageBigPlayBtn")?.classList.remove("hidden");
+    const scrubberEl = document.getElementById("videoScrubber");
+    if (scrubberEl) {
+      scrubberEl.value = "0";
+      scrubberEl.style.setProperty("--scrub-pct", "0%");
+    }
     const btnTts = document.getElementById("btnToggleTts");
     if (btnTts) {
-      btnTts.textContent = state.animEngine.ttsEnabled ? "🔊 Озвучка: ВКЛ" : "🔇 Озвучка: ВЫКЛ";
+      btnTts.textContent = state.animEngine.ttsEnabled ? "Выключить озвучку" : "Включить озвучку";
     }
     updateAudioStreamBadge(null);
   }
@@ -1361,8 +1600,11 @@
       saveLectureToHistory(result);
       savePersistedState();
 
+      if (Array.isArray(result.warnings) && result.warnings.length) {
+        result.warnings.forEach((w) => showFlashToast(w, "warn"));
+      }
       if (!isInitialAutoRun) {
-        showFlashToast(`Готово на 100%! Сценарий, ${result.scenes.length} уникальных 2D-сцен и озвучка запущены.`, "success");
+        showFlashToast(`Готово на 100%! ${result.scenes.length} сцен и озвучка готовы — нажмите ▶ Играть.`, "success");
       }
     } catch (err) {
       if (llmTicker) clearInterval(llmTicker);
@@ -1488,21 +1730,19 @@
     if (genStage) genStage.classList.add("hidden");
     if (contentWrap) contentWrap.classList.remove("hidden");
 
-    document.getElementById("sec2-title").textContent = res.courseTitle;
-    document.getElementById("resultsSubtitle").textContent =
-      `Терминов: ${res.glossary.length} · Сцен 2D-анимации: ${res.scenes.length} · Язык: ${(res.outputLang || "ru").toUpperCase()}`;
+    const titleEl = document.getElementById("sec2-title");
+    if (titleEl) titleEl.textContent = res.courseTitle;
 
     const cacheBadge = document.getElementById("cacheHitBadge");
-    cacheBadge.textContent = isCacheHit
-      ? "✓ Проверено ИИ · Из памяти (бесплатно)"
-      : "✓ Проверено ИИ · Подробнее";
-
-    document.getElementById("readabilityBadge").textContent =
-      `Ясный язык: ${res.avgReadability || 95}/100`;
-    document.getElementById("domainBadge").textContent = res.domainName || "Универсальный";
+    if (cacheBadge) {
+      cacheBadge.classList.remove("hidden");
+      cacheBadge.textContent = isCacheHit
+        ? "Отчёт проверки (из кэша)"
+        : "Отчёт проверки и код";
+    }
 
     const sbHeader = document.querySelector(".storyboard-header h3");
-    if (sbHeader) sbHeader.textContent = `Сцены мультфильма (${res.scenes.length})`;
+    if (sbHeader) sbHeader.textContent = `Сцены видео (${res.scenes.length})`;
 
     renderStoryboardList(res.scenes);
     renderNotesAndGlossary(res);
@@ -1599,7 +1839,7 @@
         const found = termEntries.find((t) => wordLower.startsWith(t.base.toLowerCase()));
         out += escapeHtml(raw.slice(lastIdx, idx));
         if (found) {
-          out += `<span class="term-highlight" data-term-id="${escapeHtml(found.id)}" title="Открыть карточку термина и дактиль КЖЯ/РЖЯ">${escapeHtml(word)}</span>`;
+          out += `<span class="term-highlight" data-term-id="${escapeHtml(found.id)}" title="Открыть карточку термина">${escapeHtml(word)}</span>`;
         } else {
           out += escapeHtml(word);
         }
@@ -1610,53 +1850,50 @@
     };
 
     notesEl.innerHTML = res.sections
-      .map((sec) => {
+      .map((sec, sIdx) => {
         const noteKey = `${res.contentHash}_sec_${sec.sectionIndex}`;
         const savedNote = state.personalNotes[noteKey] || "";
-        const rd = sec.readability || { score: 95, origAvgWords: 22, plainAvgWords: 11 };
         const sceneIdx = typeof sec.linkedSceneIndex === "number" ? sec.linkedSceneIndex : Math.min((res.scenes?.length || 1) - 1, sec.sectionIndex - 1);
+        const themeIdx = sIdx % 6;
+        const isOriginalMode = state.notesMode === "original";
         return `
-      <article class="note-block">
+      <article class="note-block" data-sec-theme="${themeIdx}">
         <div class="note-block-header">
           <h3>${escapeHtml(sec.title)}</h3>
           <div class="note-header-badges">
-            ${sec.sourceBadge ? `<span class="source-cite-badge">📌 ${escapeHtml(sec.sourceBadge)}</span>` : ""}
-            <span class="note-section-tag">Ясность: ${rd.score}/100 (${rd.origAvgWords} → ${rd.plainAvgWords} сл.)</span>
-            <button type="button" class="btn-jump-scene no-print" data-goto-scene="${sceneIdx}" title="Открыть эту тему в 2D-мультфильме">
-              🎬 Сцена ${sceneIdx + 1}
+            <button type="button" class="btn-jump-scene no-print" data-goto-scene="${sceneIdx}" title="Открыть эту тему в видео">
+              Сцена ${sceneIdx + 1}
             </button>
           </div>
         </div>
-        <div class="note-plain-box">
-          <div class="note-plain-label">✨ Простое объяснение темы:</div>
-          ${
-            sec.plainBlocks
-              ? `<div class="note-core-idea">${highlightTermsInText(sec.plainBlocks.coreIdea)}</div>
-                 ${sec.plainBlocks.analogy ? `<div class="note-analogy-box">💡 ${highlightTermsInText(sec.plainBlocks.analogy)}</div>` : ""}
-                 ${
-                   Array.isArray(sec.plainBlocks.termBreakdown) && sec.plainBlocks.termBreakdown.length
-                     ? `<div class="note-terms-row">${sec.plainBlocks.termBreakdown
-                         .map((tb) => `<div class="note-term-chip" ${tb.id ? `data-term-id="${escapeHtml(tb.id)}" style="cursor:pointer;"` : ""}><strong>${escapeHtml(tb.term)}</strong> — ${escapeHtml(tb.plain)}</div>`)
-                         .join("")}</div>`
-                     : ""
-                 }
-                 ${
-                   Array.isArray(sec.plainBullets) && sec.plainBullets.length
-                     ? `<ul class="note-bullets-list">${sec.plainBullets.map((b) => `<li>${highlightTermsInText(b)}</li>`).join("")}</ul>`
-                     : ""
-                 }`
-              : `<div>${highlightTermsInText(sec.plainSummary)}</div>`
-          }
-        </div>
         ${
-          state.notesMode === "dual"
-            ? `<div class="note-academic-box">
-                 <strong>📘 Оригинальный академический текст (${escapeHtml(sec.sourceBadge || "для экзамена")}):</strong><br/>
-                 ${highlightTermsInText(sec.academicOriginal)}
+          isOriginalMode
+            ? `<div class="note-academic-box">${highlightTermsInText(sec.academicOriginal)}</div>`
+            : `<div class="note-plain-box">
+                 ${
+                   sec.plainBlocks
+                     ? `<div class="note-core-idea">
+                          <span class="note-card-kicker">Главная мысль</span>
+                          <div>${highlightTermsInText(sec.plainBlocks.coreIdea)}</div>
+                        </div>
+                        ${sec.plainBlocks.analogy ? `<div class="note-analogy-box"><span class="note-card-kicker">Пример из жизни</span><div>${highlightTermsInText(sec.plainBlocks.analogy)}</div></div>` : ""}
+                        ${
+                          Array.isArray(sec.plainBlocks.termBreakdown) && sec.plainBlocks.termBreakdown.length
+                            ? `<div class="note-terms-row">${sec.plainBlocks.termBreakdown
+                                .map((tb) => `<div class="note-term-chip" ${tb.id ? `data-term-id="${escapeHtml(tb.id)}" style="cursor:pointer;"` : ""}><strong>${escapeHtml(tb.term)}</strong> — ${escapeHtml(tb.plain)}</div>`)
+                                .join("")}</div>`
+                            : ""
+                        }
+                        ${
+                          Array.isArray(sec.plainBullets) && sec.plainBullets.length
+                            ? `<div class="note-takeaways-wrap"><span class="note-card-kicker">Что запомнить</span><ul class="note-bullets-list">${sec.plainBullets.map((b) => `<li>${highlightTermsInText(b)}</li>`).join("")}</ul></div>`
+                            : ""
+                        }`
+                     : `<div class="note-core-idea">${highlightTermsInText(sec.plainSummary)}</div>`
+                 }
                </div>`
-            : ""
         }
-        <input type="text" class="personal-note-input no-print" data-note-key="${escapeHtml(noteKey)}" value="${escapeHtml(savedNote)}" placeholder="✏️ Ваша личная заметка к этому разделу (автосохранение и экспорт в .DOC)..." />
+        <input type="text" class="personal-note-input no-print" data-note-key="${escapeHtml(noteKey)}" value="${escapeHtml(savedNote)}" placeholder="Ваша личная заметка к этому разделу..." />
       </article>`;
       })
       .join("");
@@ -1676,14 +1913,12 @@
           .map(
             (g) => `
           <div class="glossary-card" data-term-id="${g.id}">
-            <div class="glossary-term-name">📌 ${escapeHtml(g.term)}</div>
-            <div class="glossary-plain"><strong>На ясном языке:</strong> ${escapeHtml(g.plain)}</div>
-            <div class="dactyl-code">🤟 Дактиль: ${escapeHtml(g.dactylBoxes || "")}</div>
-            <div class="sign-hint-text">${escapeHtml(g.signHint || "")}</div>
+            <div class="glossary-term-name">${escapeHtml(g.term)}</div>
+            <div class="glossary-plain">${escapeHtml(g.plain)}</div>
           </div>`
           )
           .join("")
-      : `<div style="padding:12px;font-size:0.8rem;color:var(--text-muted);">По запросу «${escapeHtml(state.glossaryQuery)}» терминов не найдено.</div>`;
+      : `<div style="padding:12px;font-size:0.86rem;color:var(--text-muted);">По запросу «${escapeHtml(state.glossaryQuery)}» терминов не найдено.</div>`;
 
     renderFlashcardsWidget(res);
 
@@ -1731,11 +1966,10 @@
         <span class="step-badge">${flipped ? "✨ ОТВЕТ НА ЯСНОМ ЯЗЫКЕ" : `КАРТОЧКА ${idx + 1} ИЗ ${total} · НАЖМИТЕ ДЛЯ ОТВЕТА`}</span>
         ${
           flipped
-            ? `<div style="font-weight:700;font-size:0.94rem;color:var(--text);margin-top:4px;">${escapeHtml(card.plain)}</div>
-               <div class="dactyl-code">🤟 ${escapeHtml(card.dactylBoxes || "")}</div>
-               <div style="font-size:0.77rem;color:var(--text-muted);">${escapeHtml(card.academic || "")}</div>`
-            : `<div style="font-family:var(--font-display);font-weight:800;font-size:1.14rem;color:var(--primary);margin-top:8px;">${escapeHtml(card.term)}</div>
-               <div style="font-size:0.78rem;color:var(--text-muted);">Попробуйте вспомнить смысл своими словами, затем нажмите на карточку</div>`
+            ? `<div style="font-weight:700;font-size:0.98rem;color:var(--text);margin-top:6px;">${escapeHtml(card.plain)}</div>
+               <div style="font-size:0.84rem;color:var(--text-muted);margin-top:6px;">${escapeHtml(card.academic || "")}</div>`
+            : `<div style="font-family:var(--font-display);font-weight:800;font-size:1.16rem;color:var(--primary);margin-top:8px;">${escapeHtml(card.term)}</div>
+               <div style="font-size:0.82rem;color:var(--text-muted);">Попробуйте вспомнить смысл своими словами, затем нажмите на карточку</div>`
         }
       </div>
       <div class="flashcard-controls">
@@ -1783,31 +2017,36 @@
   function showTermPopover(termObj) {
     document.getElementById("popoverTermTitle").textContent = termObj.term;
     document.getElementById("popoverPlainText").textContent = termObj.plain;
-    document.getElementById("popoverDactylText").textContent = termObj.dactylBoxes || "";
-    document.getElementById("popoverSignHintText").textContent = termObj.signHint || "";
     document.getElementById("popoverAcademicText").textContent = termObj.academic;
     document.getElementById("popoverExampleText").textContent = termObj.example;
     document.getElementById("termPopoverBackdrop")?.classList.remove("hidden");
     document.getElementById("termPopover").classList.remove("hidden");
   }
 
-  // 9. Настоящая двухуровневая Интеллект-карта (Тема -> Разделы -> Термины) с Pan & Zoom и переходом к сцене видео
+  // 9. Настоящая двухуровневая Интеллект-карта (Тема -> Разделы -> Термины) без наложений, с Pan & Zoom и переходом к сцене видео
   function renderTwoLevelMindMapSVG(res) {
     const container = document.getElementById("mindmapContainer");
     const detailBox = document.getElementById("mindmapNodeDetail");
     const centerTitle = res.courseTitle.split("·").pop().trim();
-    const sections = (res.sections || []).slice(0, 4);
-    const terms = (res.glossary || []).slice(0, 8);
+    const sections = (res.sections || []).slice(0, 6);
+    const terms = (res.glossary || []).slice(0, 12);
+    const isHC = document.body.classList.contains("high-contrast");
     state.mindmapZoom = 1.0;
     state.mindmapPan = { x: 0, y: 0 };
+    const zoomResetBtn = document.getElementById("btnZoomReset");
+    if (zoomResetBtn) zoomResetBtn.textContent = "100%";
 
-    const jewelPalette = [
-      { fill: "#EEF4FF", stroke: "#3B82F6", text: "#1E3A8A", link: "#93C5FD" },
-      { fill: "#ECFDF5", stroke: "#10B981", text: "#065F46", link: "#6EE7B7" },
-      { fill: "#F5F3FF", stroke: "#8B5CF6", text: "#4C1D95", link: "#C4B5FD" },
-      { fill: "#FFF1F2", stroke: "#F43F5E", text: "#881337", link: "#FDA4AF" },
-      { fill: "#FFFBEB", stroke: "#D97706", text: "#78350F", link: "#FCD34D" }
-    ];
+    const jewelPalette = isHC
+      ? [
+          { fill: "#111827", fillEnd: "#1E293B", stroke: "#93C5FD", text: "#FFFFFF", link: "#93C5FD", termFill: "#0F172A", termText: "#F8FAFC" },
+          { fill: "#111827", fillEnd: "#1E293B", stroke: "#60A5FA", text: "#FFFFFF", link: "#60A5FA", termFill: "#0F172A", termText: "#F8FAFC" },
+          { fill: "#111827", fillEnd: "#1E293B", stroke: "#38BDF8", text: "#FFFFFF", link: "#38BDF8", termFill: "#0F172A", termText: "#F8FAFC" }
+        ]
+      : [
+          { fill: "#EFF4FF", fillEnd: "#DBEAFE", stroke: "#1E3A8A", text: "#0F172A", link: "#93C5FD", termFill: "#FFFFFF", termText: "#0F172A" },
+          { fill: "#F1F5FB", fillEnd: "#E2E8F0", stroke: "#0F2942", text: "#0F172A", link: "#94A3B8", termFill: "#FFFFFF", termText: "#0F172A" },
+          { fill: "#F8FAFC", fillEnd: "#EFF6FF", stroke: "#1D4ED8", text: "#1E3A8A", link: "#93C5FD", termFill: "#FFFFFF", termText: "#0F172A" }
+        ];
 
     const measureCanvas = document.createElement("canvas");
     const mCtx = measureCanvas.getContext("2d");
@@ -1830,28 +2069,21 @@
       return lines.slice(0, maxLn);
     };
 
-    const W = 1220;
-    const H = 580;
-    const cx = W / 2;
-    const cy = H / 2;
-
-    // Распределяем термины по разделам (2-й уровень иерархии)
     const usedTermIds = new Set();
     const branchTree = sections.map((sec, sIdx) => {
       const matched = terms.filter((g) => {
         if (usedTermIds.has(g.id)) return false;
         const stem = g.term.split(/[/(]/)[0].trim().toLowerCase().slice(0, 6);
         return stem.length >= 3 && `${sec.title} ${sec.academicOriginal}`.toLowerCase().includes(stem);
-      }).slice(0, 2);
+      }).slice(0, 3);
       matched.forEach((m) => usedTermIds.add(m.id));
       return { sec, sIdx, children: matched };
     });
 
-    // Оставшиеся термины равномерно прикрепляем к веткам разделов
     terms.forEach((g) => {
       if (usedTermIds.has(g.id) || !branchTree.length) return;
       const targetBranch = branchTree.reduce((best, b) => (b.children.length < best.children.length ? b : best), branchTree[0]);
-      if (targetBranch.children.length < 2) {
+      if (targetBranch.children.length < 3) {
         targetBranch.children.push(g);
         usedTermIds.add(g.id);
       }
@@ -1860,31 +2092,55 @@
     const rightBranches = branchTree.filter((_, i) => i % 2 === 0);
     const leftBranches = branchTree.filter((_, i) => i % 2 === 1);
 
-    const rootLines = wrapLines(centerTitle, 178, "800 13.5px Manrope, sans-serif", 3);
-    const rootW = 204;
-    const rootH = Math.max(66, rootLines.length * 19 + 26);
+    const branchSlotH = (br) => Math.max(88, br.children.length * 64 + 24);
+    const sumSideH = (arr) => arr.reduce((acc, br) => acc + branchSlotH(br), 0) + Math.max(0, arr.length - 1) * 18;
+    const leftTotalH = sumSideH(leftBranches);
+    const rightTotalH = sumSideH(rightBranches);
+
+    const W = 1440;
+    const H = Math.max(580, Math.max(leftTotalH, rightTotalH) + 96);
+    const cx = W / 2;
+    const cy = H / 2;
+
+    const rootLines = wrapLines(centerTitle, 186, "800 14px Manrope, sans-serif", 3);
+    const rootW = 216;
+    const rootH = Math.max(74, rootLines.length * 20 + 30);
 
     let pathsXml = "";
     let nodesXml = "";
     const interactiveRecords = [];
 
-    const renderSide = (branches, isRight) => {
-      const bCount = branches.length;
-      if (!bCount) return;
-      const secStepY = H / (bCount + 1);
+    interactiveRecords.push({
+      kind: "root",
+      badge: "ГЛАВНАЯ ТЕМА КУРСА",
+      title: centerTitle,
+      plain: res.sections?.[0]?.plainBlocks?.coreIdea || "Обзор всех разделов и ключевых терминов лекции.",
+      extra: `Разделов: ${sections.length} · Терминов: ${terms.length}`,
+      sceneIndex: 0
+    });
 
-      branches.forEach((br, posIdx) => {
+    const renderSide = (branches, isRight) => {
+      if (!branches.length) return;
+      const totalH = sumSideH(branches);
+      let cursorY = cy - totalH / 2;
+
+      branches.forEach((br) => {
+        const slotH = branchSlotH(br);
         const pal = jewelPalette[br.sIdx % jewelPalette.length];
-        const sy = secStepY * (posIdx + 1);
-        const sx = isRight ? cx + 220 : cx - 220;
-        const secW = 186;
-        const sLines = wrapLines(br.sec.title, 158, "700 12.5px Manrope, sans-serif", 2);
+        const gradId = `mmGrad_${br.sIdx}`;
+        const sy = cursorY + slotH / 2;
+        cursorY += slotH + 18;
+
+        const sx = isRight ? cx + 284 : cx - 284;
+        const secW = 196;
+        const sLines = wrapLines(br.sec.title, 166, "700 12.5px Manrope, sans-serif", 2);
         const secH = 26 + sLines.length * 16 + 14;
 
         const rx1 = isRight ? cx + rootW / 2 : cx - rootW / 2;
         const rx2 = isRight ? sx - secW / 2 : sx + secW / 2;
         const rMid = rx1 + (rx2 - rx1) * 0.5;
-        pathsXml += `<path d="M ${rx1},${cy} C ${rMid},${cy} ${rMid},${sy} ${rx2},${sy}" fill="none" stroke="${pal.link}" stroke-width="2.8" />`;
+        pathsXml += `<path d="M ${rx1},${cy} C ${rMid},${cy} ${rMid},${sy} ${rx2},${sy}" fill="none" stroke="${pal.link}" stroke-width="2.6" stroke-linecap="round" />`;
+        pathsXml += `<circle cx="${rx2}" cy="${sy}" r="3.8" fill="${pal.stroke}" />`;
 
         const secRecIdx = interactiveRecords.length;
         interactiveRecords.push({
@@ -1897,31 +2153,33 @@
         });
 
         const sTitleTspans = sLines
-          .map((ln, lIdx) => `<tspan x="${sx}" y="${sy - secH / 2 + 28 + lIdx * 16}">${escapeHtml(ln)}</tspan>`)
+          .map((ln, lIdx) => `<tspan x="${sx}" y="${sy - secH / 2 + 29 + lIdx * 16}">${escapeHtml(ln)}</tspan>`)
           .join("");
 
         nodesXml += `
           <g class="mm-node" data-mm-rec="${secRecIdx}" style="cursor:pointer;">
-            <rect x="${sx - secW / 2}" y="${sy - secH / 2}" width="${secW}" height="${secH}" rx="14" ry="14" fill="${pal.fill}" stroke="${pal.stroke}" stroke-width="1.8" />
+            <rect class="mm-card" x="${sx - secW / 2}" y="${sy - secH / 2}" width="${secW}" height="${secH}" rx="14" ry="14" fill="url(#${gradId})" stroke="${pal.stroke}" stroke-width="1.8" filter="url(#mmShadow)" />
             <text x="${sx}" y="${sy - secH / 2 + 14}" text-anchor="middle" fill="${pal.stroke}" font-family="JetBrains Mono, monospace" font-size="9.5" font-weight="800">${escapeHtml(br.sec.sourceBadge || `РАЗДЕЛ ${br.sIdx + 1}`)}</text>
             <text text-anchor="middle" fill="${pal.text}" font-family="Manrope, Inter, sans-serif" font-size="12.5" font-weight="700">${sTitleTspans}</text>
           </g>`;
 
-        // Уровень 2: Термины этого раздела
+        // Уровень 2: Термины этого раздела без перекрытий
         const kids = br.children;
+        const kidStep = 58;
+        const kidsBlockH = Math.max(0, (kids.length - 1) * kidStep);
         kids.forEach((termObj, kIdx) => {
-          const offsetY = kids.length === 1 ? 0 : (kIdx === 0 ? -42 : 42);
-          const ty = Math.max(46, Math.min(H - 46, sy + offsetY));
-          const tx = isRight ? sx + 225 : sx - 225;
+          const ty = sy - kidsBlockH / 2 + kIdx * kidStep;
+          const tx = isRight ? sx + 276 : sx - 276;
           const tW = 192;
           const cleanT = termObj.term.split(/[/(]/)[0].trim();
           const tLines = wrapLines(cleanT, 166, "700 12px Manrope, sans-serif", 2);
-          const tH = 20 + tLines.length * 15 + 6;
+          const tH = 18 + tLines.length * 15 + 10;
 
           const tx1 = isRight ? sx + secW / 2 : sx - secW / 2;
           const tx2 = isRight ? tx - tW / 2 : tx + tW / 2;
           const tMid = tx1 + (tx2 - tx1) * 0.5;
-          pathsXml += `<path d="M ${tx1},${sy} C ${tMid},${sy} ${tMid},${ty} ${tx2},${ty}" fill="none" stroke="${pal.link}" stroke-width="1.9" stroke-dasharray="4 3" />`;
+          pathsXml += `<path d="M ${tx1},${sy} C ${tMid},${sy} ${tMid},${ty} ${tx2},${ty}" fill="none" stroke="${pal.link}" stroke-width="1.8" stroke-dasharray="4 3" stroke-linecap="round" />`;
+          pathsXml += `<circle cx="${tx2}" cy="${ty}" r="3" fill="${pal.stroke}" />`;
 
           const termRecIdx = interactiveRecords.length;
           interactiveRecords.push({
@@ -1941,8 +2199,8 @@
 
           nodesXml += `
             <g class="mm-node" data-mm-rec="${termRecIdx}" style="cursor:pointer;">
-              <rect x="${tx - tW / 2}" y="${ty - tH / 2}" width="${tW}" height="${tH}" rx="12" ry="12" fill="#FFFFFF" stroke="${pal.stroke}" stroke-width="1.5" />
-              <text text-anchor="middle" fill="#18181B" font-family="Manrope, Inter, sans-serif" font-size="12" font-weight="700">${tTspans}</text>
+              <rect class="mm-card" x="${tx - tW / 2}" y="${ty - tH / 2}" width="${tW}" height="${tH}" rx="12" ry="12" fill="${pal.termFill}" stroke="${pal.stroke}" stroke-width="1.6" filter="url(#mmShadow)" />
+              <text text-anchor="middle" fill="${pal.termText}" font-family="Manrope, Inter, sans-serif" font-size="12" font-weight="700">${tTspans}</text>
             </g>`;
         });
       });
@@ -1952,23 +2210,44 @@
     renderSide(leftBranches, false);
 
     const rootTspans = rootLines
-      .map((ln, lIdx) => `<tspan x="${cx}" y="${cy - ((rootLines.length - 1) * 18) / 2 + lIdx * 18 + 4}">${escapeHtml(ln)}</tspan>`)
+      .map((ln, lIdx) => `<tspan x="${cx}" y="${cy - ((rootLines.length - 1) * 19) / 2 + lIdx * 19 + 5}">${escapeHtml(ln)}</tspan>`)
       .join("");
+
+    const branchGradsXml = jewelPalette
+      .map(
+        (pal, i) => `
+        <linearGradient id="mmGrad_${i}" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="${pal.fill}" />
+          <stop offset="100%" stop-color="${pal.fillEnd}" />
+        </linearGradient>`
+      )
+      .join("");
+
+    const canvasBg = isHC ? "#0B0F17" : "#F4F6FB";
+    const dotColor = isHC ? "#334155" : "#CBD5E1";
 
     container.innerHTML = `
       <svg id="lectureMindmapSvg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}">
         <defs>
+          <filter id="mmShadow" x="-12%" y="-12%" width="124%" height="132%">
+            <feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="${isHC ? "#000000" : "#0F172A"}" flood-opacity="${isHC ? "0.45" : "0.08"}" />
+          </filter>
+          <linearGradient id="mmRootGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="${isHC ? "#1E293B" : "#0F172A"}" />
+            <stop offset="100%" stop-color="${isHC ? "#0F172A" : "#1E293B"}" />
+          </linearGradient>
+          ${branchGradsXml}
           <pattern id="mmDots" width="24" height="24" patternUnits="userSpaceOnUse">
-            <circle cx="12" cy="12" r="1" fill="#E2DDD2" />
+            <circle cx="12" cy="12" r="1.15" fill="${dotColor}" />
           </pattern>
         </defs>
-        <rect width="${W}" height="${H}" rx="16" fill="#FAF9F5" />
+        <rect width="${W}" height="${H}" rx="16" fill="${canvasBg}" />
         <rect width="${W}" height="${H}" rx="16" fill="url(#mmDots)" />
         <g id="mindmapViewport">
           ${pathsXml}
-          <g>
-            <rect x="${cx - rootW / 2}" y="${cy - rootH / 2}" width="${rootW}" height="${rootH}" rx="18" fill="#18181B" stroke="#0F172A" stroke-width="1.5" />
-            <text text-anchor="middle" fill="#FAF9F5" font-family="Manrope, sans-serif" font-size="13.5" font-weight="800">${rootTspans}</text>
+          <g class="mm-node" data-mm-rec="0" style="cursor:pointer;">
+            <rect class="mm-card" x="${cx - rootW / 2}" y="${cy - rootH / 2}" width="${rootW}" height="${rootH}" rx="18" fill="url(#mmRootGrad)" stroke="${isHC ? "#FBBF24" : "#0D9488"}" stroke-width="2.2" filter="url(#mmShadow)" />
+            <text text-anchor="middle" fill="#FFFFFF" font-family="Manrope, sans-serif" font-size="13.5" font-weight="800">${rootTspans}</text>
           </g>
           ${nodesXml}
         </g>
@@ -1977,23 +2256,25 @@
     const selectRecord = (recIdx) => {
       const rec = interactiveRecords[recIdx];
       if (!rec) return;
+      container.querySelectorAll(".mm-node").forEach((n) => {
+        n.classList.toggle("is-selected", parseInt(n.getAttribute("data-mm-rec"), 10) === recIdx);
+      });
       detailBox.innerHTML = `
         <span class="step-badge">${escapeHtml(rec.badge)}</span>
-        <h4 style="font-size:1.06rem;margin:6px 0 8px;">${escapeHtml(rec.title)}</h4>
-        <p style="margin-bottom:8px;font-size:0.85rem;"><strong>✨ Простыми словами:</strong> ${escapeHtml(rec.plain)}</p>
-        ${rec.dactyl ? `<div class="dactyl-code">🤟 Дактиль: ${escapeHtml(rec.dactyl)}</div>` : ""}
-        ${rec.signHint ? `<p style="font-size:0.77rem;color:var(--text-muted);margin:6px 0;">${escapeHtml(rec.signHint)}</p>` : ""}
-        ${rec.extra ? `<p style="font-size:0.8rem;color:var(--text-secondary);margin-bottom:8px;">💡 ${escapeHtml(rec.extra)}</p>` : ""}
-        ${rec.academic ? `<p style="font-size:0.8rem;color:var(--text-secondary);margin-bottom:10px;"><strong>📘 Для экзамена:</strong> ${escapeHtml(rec.academic)}</p>` : ""}
+        <h4 style="font-size:1.1rem;margin:8px 0 10px;">${escapeHtml(rec.title)}</h4>
+        <p style="margin-bottom:10px;font-size:0.94rem;line-height:1.6;"><strong>Простыми словами:</strong> ${escapeHtml(rec.plain)}</p>
+        ${rec.extra ? `<p style="font-size:0.88rem;color:var(--text-secondary);margin-bottom:10px;"><strong>Пример:</strong> ${escapeHtml(rec.extra)}</p>` : ""}
+        ${rec.academic ? `<p style="font-size:0.88rem;color:var(--text-secondary);margin-bottom:12px;"><strong>Для экзамена:</strong> ${escapeHtml(rec.academic)}</p>` : ""}
         <button type="button" class="btn-primary-sm no-print" id="btnMmGotoScene" data-scene="${rec.sceneIndex || 0}">
-          🎬 Показать в 2D-мультфильме (Сцена ${(rec.sceneIndex || 0) + 1})
+          Показать в видео (Сцена ${(rec.sceneIndex || 0) + 1})
         </button>`;
       document.getElementById("btnMmGotoScene")?.addEventListener("click", (ev) => {
         jumpToVideoScene(parseInt(ev.currentTarget.getAttribute("data-scene"), 10) || 0, 0);
       });
     };
 
-    if (interactiveRecords.length > 0) selectRecord(0);
+    if (interactiveRecords.length > 1) selectRecord(1);
+    else if (interactiveRecords.length > 0) selectRecord(0);
 
     container.querySelectorAll(".mm-node").forEach((node) => {
       node.addEventListener("click", () => {
@@ -2060,6 +2341,8 @@
           const ratio = curDist / pinchStartDist;
           state.mindmapZoom = Math.max(0.7, Math.min(2.2, +(pinchStartZoom * ratio).toFixed(2)));
           container._applyMmTransform?.();
+          const resetBtn = document.getElementById("btnZoomReset");
+          if (resetBtn) resetBtn.textContent = `${Math.round(state.mindmapZoom * 100)}%`;
         }
       }, { passive: false });
       container.addEventListener("touchend", () => {
@@ -2072,6 +2355,8 @@
           const delta = e.deltaY < 0 ? 0.1 : -0.1;
           state.mindmapZoom = Math.max(0.7, Math.min(1.85, +(state.mindmapZoom + delta).toFixed(2)));
           container._applyMmTransform?.();
+          const resetBtn = document.getElementById("btnZoomReset");
+          if (resetBtn) resetBtn.textContent = `${Math.round(state.mindmapZoom * 100)}%`;
         },
         { passive: false }
       );
@@ -2085,16 +2370,10 @@
     const countBadge = document.getElementById("quizCountBadge");
     if (countBadge) countBadge.textContent = String(count);
 
-    const res = state.pipelineResult;
-    const fullCount = res?.fullQuizCount || res?.quizFull?.length || count;
     const btnFull = document.getElementById("btnQuizModeFull");
-    const btnQuick = document.getElementById("btnQuizModeQuick");
     if (btnFull) {
-      btnFull.textContent = `Полный тест (${fullCount})`;
-      btnFull.classList.toggle("active", (res?.quizMode || "full") === "full");
-    }
-    if (btnQuick) {
-      btnQuick.classList.toggle("active", res?.quizMode === "quick");
+      btnFull.textContent = `Полный тест (${count})`;
+      btnFull.classList.add("active");
     }
 
     state.quizErrorsOnly = false;
@@ -2121,7 +2400,7 @@
             <span class="quiz-status-pill hidden" id="quiz_status_${qIdx}"></span>
             ${q.sourceBadge ? `<span class="source-cite-badge">📌 ${escapeHtml(q.sourceBadge)}</span>` : ""}
             ${q.angleLabel ? `<span class="note-section-tag">${escapeHtml(q.angleLabel)}</span>` : ""}
-            ${q.hint ? `<button type="button" class="btn-quiz-hint no-print" data-hint-q="${qIdx}">💡 Подсказка</button>` : ""}
+            ${q.hint ? `<button type="button" class="btn-quiz-hint no-print" data-hint-q="${qIdx}">Подсказка</button>` : ""}
           </div>
         </div>
         ${q.hint ? `<div class="quiz-hint-box hidden no-print" id="quiz_hint_${qIdx}">${escapeHtml(q.hint)}</div>` : ""}
@@ -2131,6 +2410,7 @@
               (opt, oIdx) => `
             <label class="quiz-option" data-q="${qIdx}" data-o="${oIdx}">
               <input type="radio" name="quiz_q_${qIdx}" value="${oIdx}" />
+              <span class="quiz-opt-letter">${["А", "Б", "В", "Г"][oIdx] || oIdx + 1}</span>
               <span class="quiz-opt-main">${escapeHtml(opt)}</span>
               <span class="quiz-opt-tag"></span>
             </label>`
@@ -2142,7 +2422,7 @@
           <div>${escapeHtml(q.explanation)}</div>
           ${
             typeof q.linkedSceneIndex === "number"
-              ? `<button type="button" class="btn-jump-scene mt-6 no-print" data-quiz-goto-scene="${q.linkedSceneIndex}">🎬 Повторить в Сцене ${q.linkedSceneIndex + 1}</button>`
+              ? `<button type="button" class="btn-jump-scene mt-6 no-print" data-quiz-goto-scene="${q.linkedSceneIndex}">Повторить в Сцене ${q.linkedSceneIndex + 1}</button>`
               : ""
           }
         </div>
@@ -2241,6 +2521,8 @@
         const svg = document.getElementById("lectureMindmapSvg");
         if (svg) svg.style.transform = `scale(${state.mindmapZoom})`;
       }
+      const resetBtn = document.getElementById("btnZoomReset");
+      if (resetBtn) resetBtn.textContent = `${Math.round(state.mindmapZoom * 100)}%`;
     };
     document.getElementById("btnZoomIn").addEventListener("click", () => applyZoom(state.mindmapZoom + 0.15));
     document.getElementById("btnZoomOut").addEventListener("click", () => applyZoom(state.mindmapZoom - 0.15));
@@ -2436,17 +2718,64 @@
     const btnSupToggle = document.getElementById("btnToggleSupervisorMode");
     const btnTts = document.getElementById("btnToggleTts");
 
-    btnPlayPause.addEventListener("click", () => {
-      if (!state.isMediaReady || !state.animEngine?.isReady) return;
-      state.animEngine.isPlaying = !state.animEngine.isPlaying;
-      btnPlayPause.textContent = state.animEngine.isPlaying ? "⏸ Пауза" : "▶ Играть";
-      if (!state.animEngine.isPlaying) {
-        state.animEngine.stopTts();
-      } else {
-        state.animEngine.unlockAudio();
-        state.animEngine.lastSpokenSceneIdx = -1;
+    const syncPlayerPlayUi = (showPulse = false) => {
+      const playing = Boolean(state.animEngine?.isPlaying);
+      btnPlayPause.textContent = playing ? "Пауза" : "Играть";
+      const bigPlay = document.getElementById("stageBigPlayBtn");
+      if (bigPlay) bigPlay.classList.toggle("hidden", playing);
+      if (showPulse) {
+        const pulseEl = document.getElementById("stageActionPulse");
+        if (pulseEl) {
+          pulseEl.textContent = playing ? "▶" : "⏸";
+          pulseEl.classList.remove("hidden", "is-animating");
+          void pulseEl.offsetWidth;
+          pulseEl.classList.add("is-animating");
+          clearTimeout(pulseEl._hideTimer);
+          pulseEl._hideTimer = setTimeout(() => {
+            pulseEl.classList.add("hidden");
+            pulseEl.classList.remove("is-animating");
+          }, 520);
+        }
       }
-    });
+    };
+
+    const togglePlayerPlayback = (showPulse = false) => {
+      if (!state.isMediaReady || !state.animEngine?.isReady) return;
+      if (typeof state.animEngine.togglePlay === "function") {
+        state.animEngine.togglePlay();
+      } else {
+        state.animEngine.isPlaying = !state.animEngine.isPlaying;
+        if (!state.animEngine.isPlaying) {
+          state.animEngine.stopTts();
+        } else {
+          state.animEngine.unlockAudio();
+          state.animEngine.lastSpokenSceneIdx = -1;
+        }
+      }
+      syncPlayerPlayUi(showPulse);
+    };
+
+    btnPlayPause.addEventListener("click", () => togglePlayerPlayback(false));
+
+    // YouTube-style управление: клик в любую точку области показа запускает/останавливает видео
+    const canvasWrap = document.getElementById("canvasWrapper");
+    if (canvasWrap) {
+      let clickTimer = null;
+      canvasWrap.addEventListener("click", (e) => {
+        if (e.target.closest("#btnCancelVideoExport")) return;
+        if (!state.isMediaReady || !state.animEngine?.isReady) return;
+        if (e.detail >= 2) {
+          clearTimeout(clickTimer);
+          clickTimer = null;
+          return;
+        }
+        clearTimeout(clickTimer);
+        clickTimer = setTimeout(() => {
+          clickTimer = null;
+          togglePlayerPlayback(true);
+        }, 160);
+      });
+    }
 
     document.getElementById("btnPrevScene").addEventListener("click", () => {
       if (!state.isMediaReady || !state.animEngine?.isReady) return;
@@ -2474,6 +2803,7 @@
     scrubber.addEventListener("input", () => {
       if (!state.isMediaReady || !state.animEngine?.isReady) return;
       const ratio = parseFloat(scrubber.value) / 1000;
+      scrubber.style.setProperty("--scrub-pct", `${(ratio * 100).toFixed(2)}%`);
       state.animEngine.previewScrubTo(ratio * state.animEngine.totalDuration);
     });
     scrubber.addEventListener("change", endScrub);
@@ -2483,19 +2813,21 @@
       state.animEngine.setPlaybackSpeed(parseFloat(speedSel.value) || 1.0);
     });
 
-    // Тумблер «После AI Supervisor (PASS) ↔ Показать дефект ДО»
-    btnSupToggle.addEventListener("click", () => {
-      state.animEngine.showRawDefectMode = !state.animEngine.showRawDefectMode;
-      if (state.animEngine.showRawDefectMode) {
-        btnSupToggle.textContent = "❌ ДО AI Supervisor: ДЕФЕКТ (Коллизия 410 px² · 22.4 CPS)";
-        btnSupToggle.classList.add("raw-mode");
-        showFlashToast("Показан сырой кадр ДО вмешательства AI Supervisor: канцелярский субтитр налезает на схему!", "warn");
-      } else {
-        btnSupToggle.textContent = "🛡️ После AI Supervisor: PASS (0 коллизий · ≤15 CPS)";
-        btnSupToggle.classList.remove("raw-mode");
-        showFlashToast("Контур AI Supervisor: текст сжат до ≤15 симв/с, коллизии устранены (0 px²)!", "success");
-      }
-    });
+    // Тумблер «После AI Supervisor (PASS) ↔ Показать дефект ДО» (если присутствует в DOM)
+    if (btnSupToggle) {
+      btnSupToggle.addEventListener("click", () => {
+        state.animEngine.showRawDefectMode = !state.animEngine.showRawDefectMode;
+        if (state.animEngine.showRawDefectMode) {
+          btnSupToggle.textContent = "ДО AI Supervisor: ДЕФЕКТ";
+          btnSupToggle.classList.add("raw-mode");
+          showFlashToast("Показан сырой кадр ДО вмешательства AI Supervisor.", "warn");
+        } else {
+          btnSupToggle.textContent = "После AI Supervisor: PASS";
+          btnSupToggle.classList.remove("raw-mode");
+          showFlashToast("Контур AI Supervisor: текст сжат, коллизии устранены.", "success");
+        }
+      });
+    }
 
     // Кнопка голосовой озвучки субтитров (TTS) и выбор мужского/женского тембра
     btnTts.addEventListener("click", async () => {
@@ -2507,21 +2839,27 @@
         setPlayerControlsLocked(true);
         btnTts.textContent = "⏳ Синтез...";
         try {
-          await state.animEngine.pregenerateAllSceneAudio(state.animEngine.scenes, state.animEngine.ttsLang, (prog) => {
+          const ttsRes = await state.animEngine.pregenerateAllSceneAudio(state.animEngine.scenes, state.animEngine.ttsLang, (prog) => {
             updateAudioStreamBadge({ readyCount: prog.doneCount, totalScenes: prog.totalScenes, mode: prog.mode, done: false });
           });
           state.animEngine.recalcTotalDuration();
-          updateAudioStreamBadge({ readyCount: state.animEngine.scenes.length, totalScenes: state.animEngine.scenes.length, mode: "neural", done: true });
+          updateAudioStreamBadge({ readyCount: state.animEngine.scenes.length, totalScenes: state.animEngine.scenes.length, mode: ttsRes?.backendMode === "neural_buffer" ? "neural" : "offline", done: true });
+          if (ttsRes?.failedScenesCount > 0) {
+            showFlashToast(`Не удалось озвучить ${ttsRes.failedScenesCount} сцен(ы) — для них показаны субтитры.`, "warn");
+          }
+        } catch (err) {
+          showFlashToast("Не удалось включить озвучку — проверьте связь с сервером.", "error");
         } finally {
           setPlayerControlsLocked(false);
         }
         state.animEngine.setTtsEnabled(true);
-        btnTts.textContent = "🔊 Озвучка: ВКЛ";
+        btnTts.textContent = "Выключить озвучку";
         if (wasPlay) state.animEngine.play();
+        syncPlayerPlayUi(false);
         return;
       }
       state.animEngine.setTtsEnabled(next);
-      btnTts.textContent = next ? "🔊 Озвучка: ВКЛ" : "🔇 Озвучка: ВЫКЛ";
+      btnTts.textContent = next ? "Выключить озвучку" : "Включить озвучку";
       if (!next) updateAudioStreamBadge(null);
     });
 
@@ -2551,12 +2889,13 @@
             s.beatDurations = null;
           });
           if (state.isMediaReady && state.animEngine.ttsEnabled) {
+            const wasPlayingBeforeSwitch = state.animEngine.isPlaying;
             setPlayerControlsLocked(true);
             const btnPlayPauseEl = document.getElementById("btnPlayPause");
             if (btnPlayPauseEl) btnPlayPauseEl.textContent = "⏳ Синтез...";
             showFlashToast("Переозвучиваем сцены выбранным голосом...", "info");
             try {
-              await state.animEngine.pregenerateAllSceneAudio(
+              const ttsRes = await state.animEngine.pregenerateAllSceneAudio(
                 state.animEngine.scenes,
                 state.animEngine.ttsLang,
                 (prog) => {
@@ -2567,16 +2906,20 @@
               if (myAc.signal.aborted) return;
               state.animEngine.recalcTotalDuration();
               updateAudioStreamBadge({ readyCount: state.animEngine.scenes.length, totalScenes: state.animEngine.scenes.length, mode: "neural", done: true });
+              if (ttsRes?.failedScenesCount > 0) {
+                showFlashToast(`Не удалось переозвучить сцен: ${ttsRes.failedScenesCount}. Показаны субтитры.`, "warn");
+              }
             } catch (err) {
               if (err?.name === "AbortError") return;
+              showFlashToast("Ошибка при смене голоса диктора — проверьте связь с сервером.", "error");
             } finally {
               if (!myAc.signal.aborted) {
                 setPlayerControlsLocked(false);
-                if (btnPlayPauseEl) btnPlayPauseEl.textContent = "⏸ Пауза";
+                if (wasPlayingBeforeSwitch) {
+                  state.animEngine.play();
+                }
+                syncPlayerPlayUi(false);
               }
-            }
-            if (!myAc.signal.aborted) {
-              state.animEngine.play();
             }
             return;
           }
@@ -2640,8 +2983,10 @@
         lastUiSec = -1;
       }
       const safeTotal = Math.max(1, total);
+      const pctStr = `${Math.min(100, Math.max(0, (cur / safeTotal) * 100)).toFixed(2)}%`;
       if (!isScrubbing) {
         scrubber.value = Math.round((cur / safeTotal) * 1000);
+        scrubber.style.setProperty("--scrub-pct", pctStr);
       }
       const curSec = Math.floor(cur);
       if (curSec !== lastUiSec) {
@@ -2689,7 +3034,7 @@
       if (!state.isMediaReady || !state.animEngine?.isReady) return;
       if (e.code === "Space") {
         e.preventDefault();
-        document.getElementById("btnPlayPause")?.click();
+        togglePlayerPlayback(true);
       } else if (e.key === "ArrowLeft") {
         e.preventDefault();
         document.getElementById("btnPrevScene")?.click();
@@ -2826,8 +3171,15 @@
       const name = document.getElementById("kt4Name").value.trim() || `Студент #${state.feedbackList.length + 1}`;
       const uni = document.getElementById("kt4Uni").value.trim() || "КазГАСА / Вуз РК";
       const group = document.getElementById("kt4Group").value;
-      const sc = parseInt(document.getElementById("kt4Score").value, 10) || 5;
-      const comment = document.getElementById("kt4Comment").value.trim() || "Отличная визуализация и понятный ясный язык.";
+      const sc = Math.max(1, Math.min(5, parseInt(document.getElementById("kt4Score").value, 10) || 5));
+      const defaultComments = {
+        5: "Отличная визуализация и понятный ясный язык.",
+        4: "Хорошая подача материала, удобно повторять тему.",
+        3: "Нормально, но хотелось бы больше примеров.",
+        2: "Есть замечания к подаче материала.",
+        1: "Материал показался сложным или неполным."
+      };
+      const comment = document.getElementById("kt4Comment").value.trim() || defaultComments[sc];
 
       const newEntry = {
         id: state.feedbackList.length + 1,
@@ -2835,9 +3187,9 @@
         university: uni,
         userGroup: group,
         clarityScore: sc,
-        termsScore: 5,
-        animationScore: 5,
-        npsScore: sc === 5 ? 10 : 9,
+        termsScore: sc,
+        animationScore: sc,
+        npsScore: sc * 2,
         comment,
         courseTitle: state.pipelineResult?.courseTitle || "Lecture AI"
       };
@@ -2850,7 +3202,13 @@
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(newEntry)
-      }).catch(() => {});
+      })
+        .then((r) => {
+          if (!r.ok) showFlashToast("Отзыв сохранён локально, но сервер вернул ошибку при записи в БД.", "warn");
+        })
+        .catch(() => {
+          showFlashToast("Отзыв сохранён локально (сервер БД недоступен).", "warn");
+        });
 
       document.getElementById("kt4Name").value = "";
       document.getElementById("kt4Comment").value = "";
@@ -2882,9 +3240,9 @@
     const count = list.length || 1;
     document.getElementById("kt4CountBadge").textContent = String(list.length);
 
-    const avgClarity = (list.reduce((a, b) => a + (b.clarityScore || 5), 0) / count).toFixed(1);
-    const avgAnim = (list.reduce((a, b) => a + (b.animationScore || 5), 0) / count).toFixed(1);
-    const avgNps = (list.reduce((a, b) => a + (b.npsScore || 10), 0) / count).toFixed(1);
+    const avgClarity = (list.reduce((a, b) => a + (Number.isFinite(b.clarityScore) ? b.clarityScore : 5), 0) / count).toFixed(1);
+    const avgAnim = (list.reduce((a, b) => a + (Number.isFinite(b.animationScore) ? b.animationScore : 5), 0) / count).toFixed(1);
+    const avgNps = (list.reduce((a, b) => a + (Number.isFinite(b.npsScore) ? b.npsScore : 10), 0) / count).toFixed(1);
 
     document.getElementById("kt4MetricsRow").innerHTML = `
       <div class="kt4-metric-card"><div class="kt4-metric-val">${list.length} / 5+</div><div class="kt4-metric-lbl">Реальных тестировщиков (Норма ≥ 5)</div></div>
@@ -2936,11 +3294,10 @@
           <p><em>Оригинал для экзамена:</em> ${escapeHtml(s.academicOriginal)}</p>${noteHtml(s)}`
         )
         .join("")}
-      <h2>2. Глоссарий терминов силлабуса + Дактиль КЖЯ/РЖЯ</h2>
+      <h2>2. Глоссарий терминов</h2>
       ${res.glossary
         .map(
-          (g) => `<div class="term"><strong>${escapeHtml(g.term)}</strong> — ${escapeHtml(g.plain)}<br/>
-          <code>Дактиль: ${escapeHtml(g.dactylBoxes || "")}</code><br/><small>${escapeHtml(g.academic)}</small></div>`
+          (g) => `<div class="term"><strong>${escapeHtml(g.term)}</strong> — ${escapeHtml(g.plain)}<br/><small>${escapeHtml(g.academic)}</small></div>`
         )
         .join("")}
       </body></html>`;
@@ -2988,7 +3345,7 @@
         c.height = h * scale;
         const ctx = c.getContext("2d");
         ctx.scale(scale, scale);
-        ctx.fillStyle = "#FAF9F5";
+        ctx.fillStyle = document.body.classList.contains("high-contrast") ? "#0B0F17" : "#F4F6FB";
         ctx.fillRect(0, 0, w, h);
         ctx.drawImage(img, 0, 0, w, h);
         URL.revokeObjectURL(url);
@@ -2996,7 +3353,10 @@
           if (pngBlob) triggerDownload(pngBlob, "Lecture_AI_MindMap.png");
         }, "image/png");
       };
-      img.onerror = () => URL.revokeObjectURL(url);
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        showFlashToast("Не удалось экспортировать интеллект-карту в PNG.", "error");
+      };
       img.src = url;
     };
 
