@@ -255,6 +255,124 @@
     safeSet(STORAGE_KEYS.HISTORY, JSON.stringify(state.history.filter((h) => !h._remoteOnly).slice(0, 8)));
   }
 
+  // Хелперы плавных переходов UI (60 FPS, уважают prefers-reduced-motion)
+  function prefersReducedMotion() {
+    return typeof window !== "undefined" && Boolean(window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches);
+  }
+
+  function showWithMotion(el, backdropEl = null) {
+    [el, backdropEl].forEach((node) => {
+      if (!node) return;
+      clearTimeout(node._hideMotionTimer);
+      node.classList.remove("is-closing", "hidden");
+    });
+  }
+
+  function hideWithMotion(el, backdropEl = null, durationMs = 185) {
+    const targets = [el, backdropEl].filter(Boolean);
+    if (!targets.length) return;
+    if (prefersReducedMotion()) {
+      targets.forEach((node) => {
+        clearTimeout(node._hideMotionTimer);
+        node.classList.remove("is-closing");
+        node.classList.add("hidden");
+      });
+      return;
+    }
+    targets.forEach((node) => {
+      if (node.classList.contains("hidden")) return;
+      clearTimeout(node._hideMotionTimer);
+      node.classList.add("is-closing");
+      node._hideMotionTimer = setTimeout(() => {
+        node.classList.add("hidden");
+        node.classList.remove("is-closing");
+      }, durationMs);
+    });
+  }
+
+  function syncPillIndex(containerOrSelector, itemSelector) {
+    const container = typeof containerOrSelector === "string"
+      ? document.querySelector(containerOrSelector)
+      : containerOrSelector;
+    if (!container) return;
+    const items = Array.from(container.querySelectorAll(itemSelector));
+    const idx = Math.max(0, items.findIndex((el) => el.classList.contains("active")));
+    container.style.setProperty("--pill-idx", String(idx));
+  }
+
+  function animatePercentValue(el, targetPct) {
+    if (!el) return;
+    const target = Math.max(0, Math.min(100, Math.round(targetPct)));
+    const curVal = parseInt(el.textContent, 10);
+    if (!Number.isFinite(curVal) || prefersReducedMotion() || Math.abs(target - curVal) <= 1) {
+      el.textContent = `${target}%`;
+      return;
+    }
+    if (el._pctRaf) cancelAnimationFrame(el._pctRaf);
+    const startVal = curVal;
+    const startTs = performance.now();
+    const dur = 200;
+    const step = (now) => {
+      const u = Math.min(1, (now - startTs) / dur);
+      const eased = 1 - Math.pow(1 - u, 3);
+      el.textContent = `${Math.round(startVal + (target - startVal) * eased)}%`;
+      if (u < 1) el._pctRaf = requestAnimationFrame(step);
+      else el._pctRaf = null;
+    };
+    el._pctRaf = requestAnimationFrame(step);
+  }
+
+  function initSheetSwipeDismiss(sheetEl, onClose) {
+    if (!sheetEl || sheetEl._swipeDismissBound) return;
+    sheetEl._swipeDismissBound = true;
+    let startY = 0;
+    let curDy = 0;
+    let dragging = false;
+
+    sheetEl.addEventListener("touchstart", (e) => {
+      if (window.innerWidth > 900 || e.touches.length !== 1) return;
+      if (sheetEl.scrollTop > 4) return;
+      const tag = (e.target?.tagName || "").toLowerCase();
+      if (tag === "input" || tag === "textarea" || tag === "select") return;
+      startY = e.touches[0].clientY;
+      curDy = 0;
+      dragging = true;
+      sheetEl.style.transition = "none";
+    }, { passive: true });
+
+    sheetEl.addEventListener("touchmove", (e) => {
+      if (!dragging) return;
+      const dy = e.touches[0].clientY - startY;
+      if (dy <= 0) {
+        curDy = 0;
+        sheetEl.style.transform = "";
+        return;
+      }
+      curDy = dy;
+      sheetEl.style.transform = `translateY(${Math.min(260, dy)}px)`;
+    }, { passive: true });
+
+    const finish = () => {
+      if (!dragging) return;
+      dragging = false;
+      sheetEl.style.transition = "";
+      if (curDy > 72) {
+        sheetEl.style.transform = "";
+        onClose();
+      } else if (curDy > 0) {
+        sheetEl.style.transition = "transform 180ms cubic-bezier(0.22, 1, 0.36, 1)";
+        sheetEl.style.transform = "translateY(0)";
+        setTimeout(() => {
+          sheetEl.style.transition = "";
+          sheetEl.style.transform = "";
+        }, 190);
+      }
+      curDy = 0;
+    };
+    sheetEl.addEventListener("touchend", finish, { passive: true });
+    sheetEl.addEventListener("touchcancel", finish, { passive: true });
+  }
+
   // Световой Toast-стек для глухих и слышащих студентов (error / warn / info / success с закрытием ✕)
   const _recentToastMap = new Map();
   function showFlashToast(message, type = "info", opts = {}) {
@@ -291,7 +409,12 @@
     item.innerHTML = `<span>${prefix}${escapeHtml(cleanMsg)}</span><button type="button" class="toast-close-btn" aria-label="Закрыть уведомление">✕</button>`;
     const removeItem = () => {
       clearTimeout(item._timer);
-      item.remove();
+      if (prefersReducedMotion()) {
+        item.remove();
+        return;
+      }
+      item.classList.add("is-closing");
+      setTimeout(() => item.remove(), 175);
     };
     item.querySelector(".toast-close-btn")?.addEventListener("click", removeItem);
     stack.appendChild(item);
@@ -307,6 +430,8 @@
       });
       document.body.classList.toggle("high-contrast", !!contrast);
       document.getElementById("btnContrast").classList.toggle("active", !!contrast);
+      const themeMeta = document.querySelector('meta[name="theme-color"]');
+      if (themeMeta) themeMeta.setAttribute("content", contrast ? "#05070b" : "#f7f9fc");
       try {
         localStorage.setItem(STORAGE_KEYS.A11Y, JSON.stringify({ scale, btnId, contrast: !!contrast }));
       } catch (_) {}
@@ -351,29 +476,30 @@
     if (btnTopMenu && topDropdown) {
       btnTopMenu.addEventListener("click", (e) => {
         e.stopPropagation();
-        const isOpen = !topDropdown.classList.contains("hidden");
-        topDropdown.classList.toggle("hidden", isOpen);
+        const isOpen = !topDropdown.classList.contains("hidden") && !topDropdown.classList.contains("is-closing");
+        if (isOpen) hideWithMotion(topDropdown, null, 165);
+        else showWithMotion(topDropdown);
         btnTopMenu.setAttribute("aria-expanded", isOpen ? "false" : "true");
       });
       topDropdown.addEventListener("click", () => {
-        topDropdown.classList.add("hidden");
+        hideWithMotion(topDropdown, null, 165);
         btnTopMenu.setAttribute("aria-expanded", "false");
       });
       document.addEventListener("click", () => {
-        topDropdown.classList.add("hidden");
+        hideWithMotion(topDropdown, null, 165);
         btnTopMenu.setAttribute("aria-expanded", "false");
       });
     }
 
     const presetsModal = document.getElementById("presetsModal");
     document.getElementById("btnOpenPresetsModal")?.addEventListener("click", () => {
-      presetsModal?.classList.remove("hidden");
+      showWithMotion(presetsModal);
     });
     document.getElementById("btnClosePresetsModal")?.addEventListener("click", () => {
-      presetsModal?.classList.add("hidden");
+      hideWithMotion(presetsModal);
     });
     presetsModal?.addEventListener("click", (e) => {
-      if (e.target === presetsModal) presetsModal.classList.add("hidden");
+      if (e.target === presetsModal) hideWithMotion(presetsModal);
     });
 
     document.querySelectorAll("[data-preset-key]").forEach((btn) => {
@@ -520,6 +646,7 @@
       document.querySelectorAll("#outputLangSwitch .btn-lang").forEach((b) => {
         b.classList.toggle("active", b.getAttribute("data-lang") === lang);
       });
+      syncPillIndex("#outputLangSwitch", ".btn-lang");
       const locale = mapLocale[lang] || "ru-RU";
       if (state.animEngine) {
         state.animEngine.ttsLang = locale;
@@ -600,6 +727,7 @@
         document.querySelectorAll(".input-panel").forEach((p) => p.classList.remove("active"));
         tab.classList.add("active");
         document.getElementById("panel-" + target).classList.add("active");
+        syncPillIndex(".input-tabs", ".input-tab");
       });
     });
 
@@ -621,9 +749,11 @@
     if (btnExportMenu && exportMenu) {
       btnExportMenu.addEventListener("click", (e) => {
         e.stopPropagation();
-        exportMenu.classList.toggle("hidden");
+        const isOpen = !exportMenu.classList.contains("hidden") && !exportMenu.classList.contains("is-closing");
+        if (isOpen) hideWithMotion(exportMenu, null, 165);
+        else showWithMotion(exportMenu);
       });
-      document.addEventListener("click", () => exportMenu.classList.add("hidden"));
+      document.addEventListener("click", () => hideWithMotion(exportMenu, null, 165));
     }
 
     document.getElementById("btnRunPipeline").addEventListener("click", () => executePipeline(false));
@@ -1273,7 +1403,7 @@
     const supEl = document.getElementById("genSupervisorStatus");
     const etaEl = document.getElementById("genEtaLabel");
 
-    if (pctEl) pctEl.textContent = `${clamped}%`;
+    if (pctEl) animatePercentValue(pctEl, clamped);
     if (fillEl) fillEl.style.width = `${clamped}%`;
     if (ariaEl) ariaEl.setAttribute("aria-valuenow", String(clamped));
     if (titleEl && title) titleEl.textContent = title;
@@ -1318,6 +1448,10 @@
   function jumpToVideoScene(sceneIdx = 0, beatIdx = 0) {
     document.querySelectorAll(".result-tab").forEach((t) => t.classList.toggle("active", t.getAttribute("data-tab") === "animation"));
     document.querySelectorAll(".result-panel").forEach((p) => p.classList.toggle("active", p.id === "tab-animation"));
+    syncPillIndex(".result-tabs", ".result-tab");
+    if (window.innerWidth <= 900) {
+      setMobileSection("animation");
+    }
     if (state.animEngine?.isReady) {
       state.animEngine.jumpToBeat(sceneIdx, beatIdx);
     }
@@ -2179,8 +2313,7 @@
     document.getElementById("popoverPlainText").textContent = termObj.plain;
     document.getElementById("popoverAcademicText").textContent = termObj.academic;
     document.getElementById("popoverExampleText").textContent = termObj.example;
-    document.getElementById("termPopoverBackdrop")?.classList.remove("hidden");
-    document.getElementById("termPopover").classList.remove("hidden");
+    showWithMotion(document.getElementById("termPopover"), document.getElementById("termPopoverBackdrop"));
   }
 
   // 9. Настоящая двухуровневая Интеллект-карта (Тема -> Разделы -> Термины) без наложений, с Pan & Zoom и переходом к сцене видео
@@ -2644,6 +2777,7 @@
         document.querySelectorAll(".result-panel").forEach((p) => p.classList.remove("active"));
         tab.classList.add("active");
         document.getElementById("tab-" + target).classList.add("active");
+        syncPillIndex(".result-tabs", ".result-tab");
       });
     });
 
@@ -2652,7 +2786,15 @@
         state.notesMode = btn.getAttribute("data-notes-mode") || "dual";
         document.querySelectorAll("[data-notes-mode]").forEach((b) => b.classList.remove("active"));
         btn.classList.add("active");
-        if (state.pipelineResult) renderNotesAndGlossary(state.pipelineResult);
+        if (state.pipelineResult) {
+          renderNotesAndGlossary(state.pipelineResult);
+          const notesEl = document.getElementById("notesContent");
+          if (notesEl) {
+            notesEl.classList.remove("is-switching");
+            void notesEl.offsetWidth;
+            notesEl.classList.add("is-switching");
+          }
+        }
       });
     });
 
@@ -2691,11 +2833,11 @@
     document.getElementById("btnZoomReset").addEventListener("click", () => applyZoom(1.0, true));
 
     const closeTermPopover = () => {
-      document.getElementById("termPopover")?.classList.add("hidden");
-      document.getElementById("termPopoverBackdrop")?.classList.add("hidden");
+      hideWithMotion(document.getElementById("termPopover"), document.getElementById("termPopoverBackdrop"));
     };
     document.getElementById("btnClosePopover").addEventListener("click", closeTermPopover);
     document.getElementById("termPopoverBackdrop")?.addEventListener("click", closeTermPopover);
+    initSheetSwipeDismiss(document.getElementById("termPopover"), closeTermPopover);
 
     document.getElementById("btnCheckQuiz").addEventListener("click", () => {
       if (!state.pipelineResult) return;
@@ -2862,8 +3004,8 @@
     const supModal = document.getElementById("supervisorModal");
     const badgeBtn = document.getElementById("cacheHitBadge");
     if (badgeBtn && supModal) {
-      badgeBtn.addEventListener("click", () => supModal.classList.remove("hidden"));
-      document.getElementById("btnCloseSupervisorModal").addEventListener("click", () => supModal.classList.add("hidden"));
+      badgeBtn.addEventListener("click", () => showWithMotion(supModal));
+      document.getElementById("btnCloseSupervisorModal").addEventListener("click", () => hideWithMotion(supModal));
     }
 
     document.getElementById("btnCopyCode").addEventListener("click", (e) => {
@@ -3173,22 +3315,25 @@
       }
     };
 
-    // Закрытие модалок по клику на затемнённый фон
-    ["supervisorModal", "billingModal", "kt4Modal", "apiModal", "mobileAccessModal"].forEach((id) => {
+    // Закрытие модалок по клику на затемнённый фон и свайпу вниз на мобильных
+    ["supervisorModal", "billingModal", "kt4Modal", "apiModal", "mobileAccessModal", "presetsModal"].forEach((id) => {
       const mEl = document.getElementById(id);
       if (mEl) {
         mEl.addEventListener("click", (e) => {
-          if (e.target === mEl) mEl.classList.add("hidden");
+          if (e.target === mEl) hideWithMotion(mEl);
         });
+        const card = mEl.querySelector(".modal-card");
+        if (card) initSheetSwipeDismiss(card, () => hideWithMotion(mEl));
       }
     });
 
     // Глобальные горячие клавиши плеера (Space, Стрелки, F, M) и Escape для закрытия модалок
     document.addEventListener("keydown", (e) => {
       if (e.key === "Escape") {
-        ["supervisorModal", "billingModal", "kt4Modal", "apiModal", "mobileAccessModal", "termPopover", "termPopoverBackdrop"].forEach((id) => {
-          document.getElementById(id)?.classList.add("hidden");
+        ["supervisorModal", "billingModal", "kt4Modal", "apiModal", "mobileAccessModal", "presetsModal"].forEach((id) => {
+          hideWithMotion(document.getElementById(id));
         });
+        hideWithMotion(document.getElementById("termPopover"), document.getElementById("termPopoverBackdrop"));
         document.querySelector(".player-column")?.classList.remove("is-ios-fullscreen");
         return;
       }
@@ -3219,9 +3364,9 @@
 
     document.getElementById("btnOpenBilling").addEventListener("click", () => {
       renderLedgerTable();
-      billingModal.classList.remove("hidden");
+      showWithMotion(billingModal);
     });
-    document.getElementById("btnCloseBilling").addEventListener("click", () => billingModal.classList.add("hidden"));
+    document.getElementById("btnCloseBilling").addEventListener("click", () => hideWithMotion(billingModal));
 
     document.getElementById("btnBuyPack500").addEventListener("click", () => {
       const txId = "kaspi_qr_" + Math.random().toString(36).slice(2, 8);
@@ -3260,9 +3405,9 @@
     document.getElementById("btnOpenApiModal").addEventListener("click", () => {
       document.getElementById("geminiKeyInput").value = localStorage.getItem("lecture_ai_gemini_key") || "";
       document.getElementById("groqKeyInput").value = localStorage.getItem("lecture_ai_groq_key") || "";
-      apiModal.classList.remove("hidden");
+      showWithMotion(apiModal);
     });
-    document.getElementById("btnCloseApiModal").addEventListener("click", () => apiModal.classList.add("hidden"));
+    document.getElementById("btnCloseApiModal").addEventListener("click", () => hideWithMotion(apiModal));
 
     document.getElementById("btnSaveApiKeys").addEventListener("click", () => {
       const gKey = document.getElementById("geminiKeyInput").value.trim();
@@ -3272,7 +3417,7 @@
       if (qKey) localStorage.setItem("lecture_ai_groq_key", qKey);
       else localStorage.removeItem("lecture_ai_groq_key");
       document.getElementById("apiStatusBadge").textContent = gKey ? "Gemini 2.5" : "ИИ";
-      apiModal.classList.add("hidden");
+      hideWithMotion(apiModal);
       showFlashToast(gKey ? "Ключи ИИ сохранены (подключён Gemini 2.5 Flash)!" : "Облачные ключи очищены (работает автономное ядро).", "success");
     });
 
@@ -3326,9 +3471,9 @@
 
     document.getElementById("btnOpenKt4Modal").addEventListener("click", () => {
       refreshFeedback();
-      modal.classList.remove("hidden");
+      showWithMotion(modal);
     });
-    document.getElementById("btnCloseKt4Modal").addEventListener("click", () => modal.classList.add("hidden"));
+    document.getElementById("btnCloseKt4Modal").addEventListener("click", () => hideWithMotion(modal));
 
     document.getElementById("btnSubmitKt4Feedback").addEventListener("click", async () => {
       const name = document.getElementById("kt4Name").value.trim() || `Студент #${state.feedbackList.length + 1}`;
@@ -3629,11 +3774,13 @@
     document.querySelectorAll("#mobileBottomNav .mob-nav-btn").forEach((b) => {
       b.classList.toggle("active", b.getAttribute("data-mob-nav") === sectionKey);
     });
+    syncPillIndex("#mobileBottomNav", ".mob-nav-btn");
     if (!isInput) {
       document.querySelectorAll(".result-tab").forEach((t) => t.classList.toggle("active", t.getAttribute("data-tab") === sectionKey));
       document.querySelectorAll(".result-panel").forEach((p) => p.classList.toggle("active", p.id === "tab-" + sectionKey));
+      syncPillIndex(".result-tabs", ".result-tab");
     }
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    window.scrollTo({ top: 0, behavior: prefersReducedMotion() ? "auto" : "smooth" });
   }
 
   function updateMobileLiveCaption(payload) {
@@ -3679,6 +3826,10 @@
     if (window.innerWidth <= 900) {
       document.body.classList.add("mobile-mode-input");
     }
+    syncPillIndex("#mobileBottomNav", ".mob-nav-btn");
+    syncPillIndex(".input-tabs", ".input-tab");
+    syncPillIndex("#outputLangSwitch", ".btn-lang");
+    syncPillIndex(".result-tabs", ".result-tab");
     document.querySelectorAll("#mobileBottomNav .mob-nav-btn").forEach((btn) => {
       btn.addEventListener("click", () => {
         const key = btn.getAttribute("data-mob-nav");
@@ -3718,11 +3869,11 @@
         }
         if (urlInput) urlInput.value = shareUrl;
         if (qrBox) qrBox.innerHTML = renderSimpleQrSvg(shareUrl);
-        mobModal.classList.remove("hidden");
+        showWithMotion(mobModal);
       });
     }
     if (btnCloseMob && mobModal) {
-      btnCloseMob.addEventListener("click", () => mobModal.classList.add("hidden"));
+      btnCloseMob.addEventListener("click", () => hideWithMotion(mobModal));
     }
     document.getElementById("btnCopyMobileUrl")?.addEventListener("click", () => {
       const val = urlInput?.value || window.location.href;

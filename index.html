@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-  <meta name="theme-color" content="#0f766e" />
+  <meta name="theme-color" content="#f7f9fc" />
   <link rel="manifest" href="/manifest.json" />
   <title>Lecture AI — Понятный конспект, схема, тест и 2D-мультфильм по лекции</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -455,6 +455,7 @@
   <!-- Модальное окно «Контроль ИИ и код анимации» (открывается по клику на бейдж ✓ Проверено ИИ) -->
   <div class="modal-backdrop hidden no-print" id="supervisorModal">
     <div class="modal-card modal-lg">
+      <div class="sheet-grabber" aria-hidden="true"></div>
       <div class="modal-header">
         <div>
           <h2>Отчёт контролирующей ИИ-модели (AI Supervisor) и код анимации</h2>
@@ -483,6 +484,7 @@
 
   <!-- Всплывающая карточка термина (Bottom Sheet на мобильных) -->
   <div class="term-popover hidden no-print" id="termPopover" role="dialog" aria-labelledby="popoverTermTitle">
+    <div class="sheet-grabber" aria-hidden="true"></div>
     <div class="term-popover-header">
       <div>
         <span class="term-badge">Термин для экзамена</span>
@@ -509,6 +511,7 @@
   <!-- Модальное окно тарифов и Kaspi QR -->
   <div class="modal-backdrop hidden no-print" id="billingModal">
     <div class="modal-card modal-lg">
+      <div class="sheet-grabber" aria-hidden="true"></div>
       <div class="modal-header">
         <div>
           <h2>Тарифы Lecture AI: Бесплатно + 100 ₸ через Kaspi QR</h2>
@@ -577,6 +580,7 @@
   <!-- Модальное окно КТ 4 -->
   <div class="modal-backdrop hidden no-print" id="kt4Modal">
     <div class="modal-card modal-lg">
+      <div class="sheet-grabber" aria-hidden="true"></div>
       <div class="modal-header">
         <div>
           <h2>Отзывы тестировщиков (КТ 4 — 5+ пользователей)</h2>
@@ -619,6 +623,7 @@
   <!-- Модальное окно ИИ API -->
   <div class="modal-backdrop hidden no-print" id="apiModal">
     <div class="modal-card">
+      <div class="sheet-grabber" aria-hidden="true"></div>
       <div class="modal-header">
         <div>
           <h2>Настройка облачных ИИ-моделей</h2>
@@ -644,6 +649,7 @@
   <!-- Модальное окно доступа со смартфона (QR-код + ссылка + PWA) -->
   <div class="modal-backdrop hidden no-print" id="mobileAccessModal">
     <div class="modal-card">
+      <div class="sheet-grabber" aria-hidden="true"></div>
       <div class="modal-header">
         <div>
           <h2>Открыть с телефона</h2>
@@ -668,6 +674,7 @@
   <!-- Модальное окно готовых примеров курсов -->
   <div class="modal-backdrop hidden no-print" id="presetsModal">
     <div class="modal-card modal-lg">
+      <div class="sheet-grabber" aria-hidden="true"></div>
       <div class="modal-header">
         <div>
           <h2>Примеры готовых курсов</h2>
