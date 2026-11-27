@@ -484,18 +484,24 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
         .replace(/\?\!/g, "?");
       if (l.startsWith("kk")) {
         s = s
+          .replace(/\([^)]*[А-Яа-яЁё]{3,}[^)]*\)/g, (m) => (/[әіңғүұқөһӘІҢҒҮҰҚӨҺ]/.test(m) ? m : " "))
+          .replace(/\([^)]*[A-Za-z]{3,}[^)]*\)/g, " ")
           .replace(/≈/g, " шамамен тең ")
           .replace(/≠/g, " тең емес ")
           .replace(/(\d+)\s*[–-]\s*(\d+)\s*%/g, "$1 ден $2 пайызға дейін")
           .replace(/(\d+)\s*%/g, "$1 пайыз");
       } else if (l.startsWith("en")) {
         s = s
+          .replace(/\([^)]*[А-Яа-яЁёӘәІіҢңҒғҮүҰұҚқӨөҺһ]{2,}[^)]*\)/g, " ")
+          .replace(/\b[А-Яа-яЁёӘәІіҢңҒғҮүҰұҚқӨөҺһ]+\b/g, " ")
           .replace(/≈/g, " approximately equals ")
           .replace(/≠/g, " does not equal ")
           .replace(/(\d+)\s*[–-]\s*(\d+)\s*%/g, "$1 to $2 percent")
           .replace(/(\d+)\s*%/g, "$1 percent");
       } else {
         s = s
+          .replace(/\([^)]*[әіңғүұқөһӘІҢҒҮҰҚӨҺ][^)]*\)/g, " ")
+          .replace(/\([^)]*[A-Za-z]{4,}[^)]*\)/g, " ")
           .replace(/≈/g, " примерно равно ")
           .replace(/≠/g, " не равно ")
           .replace(/\bи\s*т\.?\s*д\.?/gi, "и так далее")
@@ -648,10 +654,14 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
     if (isStale()) return;
 
     const voice = this.selectBestVoice(voices, this.ttsLang);
-    if (!voice && this.ttsLang.startsWith("kk")) {
+    if (!voice) {
       if (!this.kkNoticeShown && this.onTtsNotice) {
         this.kkNoticeShown = true;
-        this.onTtsNotice("Локальный сервер озвучки выключен, а в браузере нет встроенного казахского голоса — показаны субтитры.");
+        this.onTtsNotice(
+          this.ttsLang.startsWith("kk")
+            ? "Сервер нейронной озвучки временно недоступен, а в браузере нет казахского голоса — показаны субтитры."
+            : "Сервер нейронной озвучки недоступен — показаны субтитры."
+        );
       }
       return;
     }
@@ -785,7 +795,7 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
     const rate = opts.rate || "";
     const pitch = opts.pitch || "";
     const beatSig = Array.isArray(opts.beats) ? opts.beats.join("|").slice(0, 64) : "";
-    return `edge3::${locale}::${voiceGender}::${emotion}::${rate}::${pitch}::${beatSig}::${cleanText}`;
+    return `edge4::${locale}::${voiceGender}::${emotion}::${rate}::${pitch}::${beatSig}::${cleanText}`;
   }
 
   async fetchEdgeTtsBuffer(cleanText, locale, opts = {}) {
@@ -956,7 +966,7 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
           voices = window.speechSynthesis.getVoices();
         }
         const bestV = this.selectBestVoice(voices, this.ttsLang);
-        this.ttsBackendMode = bestV || !this.ttsLang.startsWith("kk") ? "browser_speech" : "subtitles_only";
+        this.ttsBackendMode = bestV ? "browser_speech" : "subtitles_only";
       } else {
         this.ttsBackendMode = "subtitles_only";
       }
@@ -987,7 +997,9 @@ window.LectureAnimationEngine = class LectureAnimationEngine {
           consecutiveErrors++;
           if (consecutiveErrors >= 2) {
             useNeuralServer = false;
-            this.ttsBackendMode = "browser_speech";
+            const voices = typeof window !== "undefined" && window.speechSynthesis ? window.speechSynthesis.getVoices() : [];
+            const bestV = this.selectBestVoice(voices, this.ttsLang);
+            this.ttsBackendMode = bestV ? "browser_speech" : "subtitles_only";
             return;
           }
         }

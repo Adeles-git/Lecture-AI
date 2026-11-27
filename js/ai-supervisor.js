@@ -19,28 +19,28 @@ window.AISupervisorPipeline = {
         law_hum: "Социология и гуманитарные науки"
       },
       moduleBadges: {
-        actor_network_web: { badge: "🌐 Сеть взаимодействий", title: "Субъекты, группы и среда" },
-        social_stratification_pyramid: { badge: "🏛️ Иерархия и уровни", title: "Структура и уровни системы" },
-        scales_balance_norm: { badge: "⚖️ Баланс и норма", title: "Равновесие факторов и правил" },
-        bio_cell_cycle: { badge: "🧬 Живая клетка и цикл", title: "Клеточный механизм в действии" },
-        bio_pathway: { badge: "🔬 Био-путь и реакция", title: "Последовательность биопроцесса" },
-        econ_funnel_waterfall: { badge: "📊 Воронка и баланс", title: "Движение ресурса и эффективность" },
-        cs_layered_pipeline: { badge: "💻 Стек и поток данных", title: "Архитектура обработки данных" },
-        eng_structural_forces: { badge: "📐 Силы и конструкция", title: "Распределение усилий в системе" },
-        system_anatomy: { badge: "🧩 Устройство системы", title: "Как части работают вместе" },
-        chronicle_timeline: { badge: "⏳ Лента этапов", title: "Последовательность и эволюция" },
-        split_versus_duel: { badge: "⚡ Сравнение подходов", title: "Два взгляда: бытовой vs научный" },
-        multi_mode_chart: { badge: "📈 Закономерность", title: "Как один фактор меняет другой" },
-        case_dossier_blueprint: { badge: "📋 Разбор на практике", title: "Прикладная задача и решение" },
-        radial_constellation_map: { badge: "✨ Карта к экзамену", title: "Все понятия урока в единой системе" },
-        cause_effect_flow: { badge: "🔗 Причина → Следствие", title: "Цепочка причин и последствий" },
-        worked_example: { badge: "🧮 Пошаговый разбор", title: "Практический пример по шагам" },
-        causal_curve: { badge: "📉 Кривая влияния", title: "Динамика изменений и порог" },
-        hero_problem_hook: { badge: "🎯 Главный вызов", title: "Ключевая проблема и решение" },
-        pipeline_energy_flow: { badge: "⚡ Поток процесса", title: "Последовательная передача сигнала" },
-        funnel_flow: { badge: "🔻 Воронка отбора", title: "Этапы фильтрации и результат" },
-        timeline_scroll: { badge: "🗓️ Хронология", title: "Ключевые вехи во времени" },
-        shield_core_architecture: { badge: "🛡️ Защитный контур", title: "Многоуровневая архитектура" }
+        actor_network_web: { badge: "Сеть взаимодействий", title: "Субъекты, группы и среда" },
+        social_stratification_pyramid: { badge: "Иерархия и уровни", title: "Структура и уровни системы" },
+        scales_balance_norm: { badge: "Баланс и норма", title: "Равновесие факторов и правил" },
+        bio_cell_cycle: { badge: "Живая клетка и цикл", title: "Клеточный механизм в действии" },
+        bio_pathway: { badge: "Био-путь и реакция", title: "Последовательность биопроцесса" },
+        econ_funnel_waterfall: { badge: "Воронка и баланс", title: "Движение ресурса и эффективность" },
+        cs_layered_pipeline: { badge: "Стек и поток данных", title: "Архитектура обработки данных" },
+        eng_structural_forces: { badge: "Силы и конструкция", title: "Распределение усилий в системе" },
+        system_anatomy: { badge: "Устройство системы", title: "Как части работают вместе" },
+        chronicle_timeline: { badge: "Лента этапов", title: "Последовательность и эволюция" },
+        split_versus_duel: { badge: "Сравнение подходов", title: "Два взгляда: бытовой vs научный" },
+        multi_mode_chart: { badge: "Закономерность", title: "Как один фактор меняет другой" },
+        case_dossier_blueprint: { badge: "Разбор на практике", title: "Прикладная задача и решение" },
+        radial_constellation_map: { badge: "Карта к экзамену", title: "Все понятия урока в единой системе" },
+        cause_effect_flow: { badge: "Причина → Следствие", title: "Цепочка причин и последствий" },
+        worked_example: { badge: "Пошаговый разбор", title: "Практический пример по шагам" },
+        causal_curve: { badge: "Кривая влияния", title: "Динамика изменений и порог" },
+        hero_problem_hook: { badge: "Главный вызов", title: "Ключевая проблема и решение" },
+        pipeline_energy_flow: { badge: "Поток процесса", title: "Последовательная передача сигнала" },
+        funnel_flow: { badge: "Воронка отбора", title: "Этапы фильтрации и результат" },
+        timeline_scroll: { badge: "Хронология", title: "Ключевые вехи во времени" },
+        shield_core_architecture: { badge: "Защитный контур", title: "Многоуровневая архитектура" }
       },
       quizQTerm: (term) => `Что простыми словами означает понятие «${term}»?`,
       quizQSec: (sec) => `Какая главная мысль раскрывается в разделе «${sec}»?`,
@@ -61,28 +61,28 @@ window.AISupervisorPipeline = {
         law_hum: "Әлеуметтану және гуманитарлық ғылымдар"
       },
       moduleBadges: {
-        actor_network_web: { badge: "🌐 Өзара байланыс торы", title: "Топтар мен ортаның байланысы" },
-        social_stratification_pyramid: { badge: "🏛️ Құрылым деңгейлері", title: "Жүйе сатылары мен құрылымы" },
-        scales_balance_norm: { badge: "⚖️ Тепе-теңдік пен норма", title: "Қағидалар мен факторлар теңгерімі" },
-        bio_cell_cycle: { badge: "🧬 Жасуша және цикл", title: "Биологиялық механизм жұмысы" },
-        bio_pathway: { badge: "🔬 Био-ағын", title: "Процестің кезеңдік тізбегі" },
-        econ_funnel_waterfall: { badge: "📊 Құндылық ағыны", title: "Ресурс қозғалысы мен нәтиже" },
-        cs_layered_pipeline: { badge: "💻 Деректер стегі", title: "Ақпаратты өңдеу архитектурасы" },
-        eng_structural_forces: { badge: "📐 Күштер мен құрылым", title: "Жүктеме мен тұрақтылық сызбасы" },
-        system_anatomy: { badge: "🧩 Жүйе құрылысы", title: "Бөліктердің өзара жұмысы" },
-        chronicle_timeline: { badge: "⏳ Уақыт пен кезеңдер", title: "Даму мен процестің реті" },
-        split_versus_duel: { badge: "⚡ Тәсілдерді салыстыру", title: "Екі көзқарас: қате vs дұрыс" },
-        multi_mode_chart: { badge: "📈 Заңдылық графигі", title: "Факторлардың өзара әсері" },
-        case_dossier_blueprint: { badge: "📋 Тәжірибелік талдау", title: "Нақты жағдайда қолдану" },
-        radial_constellation_map: { badge: "✨ Емтихан картасы", title: "Тақырыптың негізгі ұғымдар жүйесі" },
-        cause_effect_flow: { badge: "🔗 Себеп → Салдар", title: "Себеп-салдар тізбегі" },
-        worked_example: { badge: "🧮 Қадамдық талдау", title: "Практикалық мысалды шешу" },
-        causal_curve: { badge: "📉 Әсер қисығы", title: "Өзгеріс динамикасы мен шек" },
-        hero_problem_hook: { badge: "🎯 Басты міндет", title: "Негізгі мәселе және шешім" },
-        pipeline_energy_flow: { badge: "⚡ Процесс ағыны", title: "Кезеңдік сигнал берілісі" },
-        funnel_flow: { badge: "🔻 Іріктеу шұңқыры", title: "Сүзгілеу және нәтиже" },
-        timeline_scroll: { badge: "🗓️ Хронология", title: "Уақыт бойынша негізгі кезеңдер" },
-        shield_core_architecture: { badge: "🛡️ Қорғаныс контуры", title: "Көпдеңгейлі архитектура" }
+        actor_network_web: { badge: "Өзара байланыс торы", title: "Топтар мен ортаның байланысы" },
+        social_stratification_pyramid: { badge: "Құрылым деңгейлері", title: "Жүйе сатылары мен құрылымы" },
+        scales_balance_norm: { badge: "Тепе-теңдік пен норма", title: "Қағидалар мен факторлар теңгерімі" },
+        bio_cell_cycle: { badge: "Жасуша және цикл", title: "Биологиялық механизм жұмысы" },
+        bio_pathway: { badge: "Био-ағын", title: "Процестің кезеңдік тізбегі" },
+        econ_funnel_waterfall: { badge: "Құндылық ағыны", title: "Ресурс қозғалысы мен нәтиже" },
+        cs_layered_pipeline: { badge: "Деректер стегі", title: "Ақпаратты өңдеу архитектурасы" },
+        eng_structural_forces: { badge: "Күштер мен құрылым", title: "Жүктеме мен тұрақтылық сызбасы" },
+        system_anatomy: { badge: "Жүйе құрылысы", title: "Бөліктердің өзара жұмысы" },
+        chronicle_timeline: { badge: "Уақыт пен кезеңдер", title: "Даму мен процестің реті" },
+        split_versus_duel: { badge: "Тәсілдерді салыстыру", title: "Екі көзқарас: қате vs дұрыс" },
+        multi_mode_chart: { badge: "Заңдылық графигі", title: "Факторлардың өзара әсері" },
+        case_dossier_blueprint: { badge: "Тәжірибелік талдау", title: "Нақты жағдайда қолдану" },
+        radial_constellation_map: { badge: "Емтихан картасы", title: "Тақырыптың негізгі ұғымдар жүйесі" },
+        cause_effect_flow: { badge: "Себеп → Салдар", title: "Себеп-салдар тізбегі" },
+        worked_example: { badge: "Қадамдық талдау", title: "Практикалық мысалды шешу" },
+        causal_curve: { badge: "Әсер қисығы", title: "Өзгеріс динамикасы мен шек" },
+        hero_problem_hook: { badge: "Басты міндет", title: "Негізгі мәселе және шешім" },
+        pipeline_energy_flow: { badge: "Процесс ағыны", title: "Кезеңдік сигнал берілісі" },
+        funnel_flow: { badge: "Іріктеу шұңқыры", title: "Сүзгілеу және нәтиже" },
+        timeline_scroll: { badge: "Хронология", title: "Уақыт бойынша негізгі кезеңдер" },
+        shield_core_architecture: { badge: "Қорғаныс контуры", title: "Көпдеңгейлі архитектура" }
       },
       quizQTerm: (term) => `«${term}» ұғымының қарапайым тілдегі мағынасы қандай?`,
       quizQSec: (sec) => `«${sec}» бөлімінен қандай басты қорытынды шығады?`,
@@ -103,28 +103,28 @@ window.AISupervisorPipeline = {
         law_hum: "Sociology & Humanities"
       },
       moduleBadges: {
-        actor_network_web: { badge: "🌐 Interaction Network", title: "Groups, Actors & Environment" },
-        social_stratification_pyramid: { badge: "🏛️ System Hierarchy", title: "Core Levels & Structure" },
-        scales_balance_norm: { badge: "⚖️ Balance & Norm", title: "Equilibrium of Rules & Factors" },
-        bio_cell_cycle: { badge: "🧬 Cell & Cycle", title: "Living Mechanism in Action" },
-        bio_pathway: { badge: "🔬 Bio-Pathway", title: "Step-by-Step Biological Flow" },
-        econ_funnel_waterfall: { badge: "📊 Funnel & Balance", title: "Value Flow & Efficiency" },
-        cs_layered_pipeline: { badge: "💻 Data Stack", title: "Layered Processing Pipeline" },
-        eng_structural_forces: { badge: "📐 Forces & Structure", title: "Force Distribution Blueprint" },
-        system_anatomy: { badge: "🧩 System Anatomy", title: "How Components Work Together" },
-        chronicle_timeline: { badge: "⏳ Stage Timeline", title: "Chronology & Process Sequence" },
-        split_versus_duel: { badge: "⚡ Approach Duel", title: "Naive View vs Core Method" },
-        multi_mode_chart: { badge: "📈 Key Pattern", title: "How Factor A Shapes Outcome B" },
-        case_dossier_blueprint: { badge: "📋 Practical Case", title: "Real-World Application" },
-        radial_constellation_map: { badge: "✨ Exam Concept Map", title: "Complete Concept Synthesis" },
-        cause_effect_flow: { badge: "🔗 Cause → Effect", title: "Causal Chain & Mechanism" },
-        worked_example: { badge: "🧮 Worked Example", title: "Step-by-Step Solution" },
-        causal_curve: { badge: "📉 Causal Curve", title: "Factor Dynamics & Threshold" },
-        hero_problem_hook: { badge: "🎯 Core Challenge", title: "Problem Hook & Resolution" },
-        pipeline_energy_flow: { badge: "⚡ Energy Pipeline", title: "Sequential Stage Transfer" },
-        funnel_flow: { badge: "🔻 Stage Funnel", title: "Filtering Stages & Yield" },
-        timeline_scroll: { badge: "🗓️ Chronology", title: "Key Milestones Over Time" },
-        shield_core_architecture: { badge: "🛡️ Shield Core", title: "Multi-Layer Core Architecture" }
+        actor_network_web: { badge: "Interaction Network", title: "Groups, Actors & Environment" },
+        social_stratification_pyramid: { badge: "System Hierarchy", title: "Core Levels & Structure" },
+        scales_balance_norm: { badge: "Balance & Norm", title: "Equilibrium of Rules & Factors" },
+        bio_cell_cycle: { badge: "Cell & Cycle", title: "Living Mechanism in Action" },
+        bio_pathway: { badge: "Bio-Pathway", title: "Step-by-Step Biological Flow" },
+        econ_funnel_waterfall: { badge: "Funnel & Balance", title: "Value Flow & Efficiency" },
+        cs_layered_pipeline: { badge: "Data Stack", title: "Layered Processing Pipeline" },
+        eng_structural_forces: { badge: "Forces & Structure", title: "Force Distribution Blueprint" },
+        system_anatomy: { badge: "System Anatomy", title: "How Components Work Together" },
+        chronicle_timeline: { badge: "Stage Timeline", title: "Chronology & Process Sequence" },
+        split_versus_duel: { badge: "Approach Duel", title: "Naive View vs Core Method" },
+        multi_mode_chart: { badge: "Key Pattern", title: "How Factor A Shapes Outcome B" },
+        case_dossier_blueprint: { badge: "Practical Case", title: "Real-World Application" },
+        radial_constellation_map: { badge: "Exam Concept Map", title: "Complete Concept Synthesis" },
+        cause_effect_flow: { badge: "Cause → Effect", title: "Causal Chain & Mechanism" },
+        worked_example: { badge: "Worked Example", title: "Step-by-Step Solution" },
+        causal_curve: { badge: "Causal Curve", title: "Factor Dynamics & Threshold" },
+        hero_problem_hook: { badge: "Core Challenge", title: "Problem Hook & Resolution" },
+        pipeline_energy_flow: { badge: "Energy Pipeline", title: "Sequential Stage Transfer" },
+        funnel_flow: { badge: "Stage Funnel", title: "Filtering Stages & Yield" },
+        timeline_scroll: { badge: "Chronology", title: "Key Milestones Over Time" },
+        shield_core_architecture: { badge: "Shield Core", title: "Multi-Layer Core Architecture" }
       },
       quizQTerm: (term) => `What does "${term}" mean in simple everyday language?`,
       quizQSec: (sec) => `What is the main takeaway from "${sec}"?`,
@@ -725,14 +725,84 @@ window.AISupervisorPipeline = {
   },
 
   detectTextLanguage(text) {
-    const sample = String(text || "").slice(0, 3000);
+    const sample = String(text || "").slice(0, 3500);
     if (!sample.trim()) return "ru";
     const kkChars = (sample.match(/[әіңғүұқөһӘІҢҒҮҰҚӨҺ]/g) || []).length;
-    if (kkChars >= 3) return "kk";
     const cyrChars = (sample.match(/[а-яёА-ЯЁ]/g) || []).length;
     const latChars = (sample.match(/[a-zA-Z]/g) || []).length;
-    if (latChars > cyrChars * 1.4 && latChars > 20) return "en";
+    const kkWords = (sample.match(/(?:^|\s)(?:және|үшін|бойынша|арқылы|болып|дегеніміз|негізгі|қазақстан|дәріс|білім|жүйесі|қарастырылады)(?=$|[\s.,;:!?])/gi) || []).length;
+    const totalCyr = cyrChars + kkChars;
+    if (kkWords >= 3 || kkChars >= 16 || (kkChars >= 4 && totalCyr > 0 && kkChars / totalCyr >= 0.045)) {
+      return "kk";
+    }
+    if (latChars > totalCyr * 1.4 && latChars > 20) return "en";
     return "ru";
+  },
+
+  // Извлекает моноязычный вариант из двуязычных/трёхъязычных терминов вида «Self-Attention / Самовнимание (Өзіндік зейін)»
+  pickTermForLang(rawTerm, targetLang = "ru") {
+    const raw = String(rawTerm || "").trim();
+    if (!raw) return "";
+    const lang = String(targetLang || "ru").toLowerCase().slice(0, 2);
+    const parts = raw
+      .split(/\s*\/\s*|\s*\(\s*|\s*\)\s*/)
+      .map((p) => p.trim())
+      .filter((p) => p.length >= 2);
+    if (parts.length <= 1) return raw;
+
+    const hasKk = (s) => /[әіңғүұқөһӘІҢҒҮҰҚӨҺ]/.test(s);
+    const hasCyr = (s) => /[а-яёА-ЯЁ]/.test(s);
+    const isPureLat = (s) => /[A-Za-z]{2,}/.test(s) && !hasCyr(s) && !hasKk(s);
+    const isPureRu = (s) => hasCyr(s) && !hasKk(s) && !/[A-Za-z]{3,}/.test(s);
+
+    if (lang === "kk") {
+      return parts.find(hasKk) || parts.find((p) => hasCyr(p) && !isPureLat(p)) || parts[0];
+    }
+    if (lang === "en") {
+      return parts.find(isPureLat) || parts[0];
+    }
+    return parts.find(isPureRu) || parts.find((p) => hasCyr(p) && !hasKk(p)) || parts[0];
+  },
+
+  // Убирает иноязычные пояснения в скобках из определений и предложений (чтобы языки не смешивались)
+  cleanForeignBrackets(rawText, targetLang = "ru") {
+    let s = String(rawText || "").trim();
+    if (!s) return "";
+    const lang = String(targetLang || "ru").toLowerCase().slice(0, 2);
+    if (lang === "kk") {
+      s = s.replace(/\s*\([^)]*[А-Яа-яЁё]{3,}[^)]*\)/g, (m) => (/[әіңғүұқөһӘІҢҒҮҰҚӨҺ]/.test(m) ? m : ""));
+      s = s.replace(/\s*\([^)]*[A-Za-z]{3,}[^)]*\)/g, "");
+    } else if (lang === "en") {
+      s = s.replace(/\s*\([^)]*[А-Яа-яЁёӘәІіҢңҒғҮүҰұҚқӨөҺһ]{2,}[^)]*\)/g, "");
+    } else {
+      s = s.replace(/\s*\([^)]*[әіңғүұқөһӘІҢҒҮҰҚӨҺ]{2,}[^)]*\)/g, "");
+    }
+    return s.replace(/\s+/g, " ").trim();
+  },
+
+  // Проверяет, нуждается ли текст в переводе/очистке под целевой язык
+  needsTranslationForLang(text, targetLang = "ru") {
+    const s = String(text || "").trim();
+    if (s.length < 3) return false;
+    const lang = String(targetLang || "ru").toLowerCase().slice(0, 2);
+    const kkChars = (s.match(/[әіңғүұқөһӘІҢҒҮҰҚӨҺ]/g) || []).length;
+    const ruOnlyChars = (s.match(/[а-яёА-ЯЁ]/g) || []).length;
+    const latChars = (s.match(/[a-zA-Z]/g) || []).length;
+    if (lang === "en") {
+      return ruOnlyChars + kkChars >= 3;
+    }
+    if (lang === "kk") {
+      if (latChars >= 8 && ruOnlyChars + kkChars === 0) return true;
+      const detected = this.detectTextLanguage(s);
+      if (detected !== "kk" && (ruOnlyChars >= 6 || latChars >= 10)) return true;
+      return false;
+    }
+    if (lang === "ru") {
+      if (kkChars >= 2) return true;
+      if (latChars > ruOnlyChars * 1.4 && latChars >= 12) return true;
+      return false;
+    }
+    return false;
   },
 
   // Динамическое извлечение сигналов ИЗ САМОЙ ЛЕКЦИИ (с локализацией RU / KK / EN)
@@ -814,16 +884,16 @@ window.AISupervisorPipeline = {
     let defaultSecLabel = this.shortLabel(sections[0]?.title || domainProfile.name, 34);
 
     if (langTag === "en") {
-      leftFail = { title: "Without Method ❌", sub: "Unstructured / error-prone approach", metric: metrics[0] || "High risk" };
-      rightPass = { title: `With ${t0} ✅`, sub: p0.slice(0, 48), metric: metrics[1] || metrics[0] || "Verified gain" };
+      leftFail = { title: "Without Method", sub: "Unstructured / error-prone approach", metric: metrics[0] || "High risk" };
+      rightPass = { title: `With ${t0}`, sub: p0.slice(0, 48), metric: metrics[1] || metrics[0] || "Verified gain" };
       deltaBadge = cleanFormula || metrics[0] || `${t0} + ${t1}`;
       xAxisLabel = "System parameter / scale";
       yAxisLabel = "Outcome & stability";
       curveALabel = `With ${t0}`;
       curveBLabel = "Baseline (without factor)";
     } else if (langTag === "kk") {
-      leftFail = { title: "Жүйесіз тәсіл ❌", sub: "Қателік пен тұрақсыздық қаупі", metric: metrics[0] || "Жоғары тәуекел" };
-      rightPass = { title: `Жүйе: ${t0} ✅`, sub: p0.slice(0, 48), metric: metrics[1] || metrics[0] || "Тұрақты нәтиже" };
+      leftFail = { title: "Жүйесіз тәсіл", sub: "Қателік пен тұрақсыздық қаупі", metric: metrics[0] || "Жоғары тәуекел" };
+      rightPass = { title: `Жүйе: ${t0}`, sub: p0.slice(0, 48), metric: metrics[1] || metrics[0] || "Тұрақты нәтиже" };
       deltaBadge = cleanFormula || metrics[0] || `${t0} + ${t1}`;
       xAxisLabel = "Жүйе параметрі / көлемі";
       yAxisLabel = "Нәтиже және тиімділік";
@@ -2162,7 +2232,7 @@ export const LectureComposition: React.FC = () => (
   },
 
   async computeContentHash(courseTitle, glossaryText, lectureText, outputLang = "ru") {
-    const raw = `v12_modern_clean||${outputLang}||${courseTitle.trim()}||${glossaryText.trim()}||${lectureText.trim()}`;
+    const raw = `v13_pure_lang||${outputLang}||${courseTitle.trim()}||${glossaryText.trim()}||${lectureText.trim()}`;
     if (window.crypto && window.crypto.subtle) {
       const buf = new TextEncoder().encode(raw);
       const digest = await window.crypto.subtle.digest("SHA-256", buf);
@@ -2176,6 +2246,265 @@ export const LectureComposition: React.FC = () => (
       h = (h * 31 + raw.charCodeAt(i)) >>> 0;
     }
     return h.toString(16);
+  },
+
+  // Предварительный перевод исходных блоков лекции и глоссария ДО сборки конспекта, 2D-сцен и теста (~30-45 строк за ~1.5 сек)
+  async translateSourceMaterialViaServer({ cleanTitle, blocks = [], glossary = [], outputLang = "ru", abortSignal = null }) {
+    if (!outputLang) return { cleanTitle, blocks, glossary, translated: true };
+    if (typeof window !== "undefined" && window.location?.protocol === "file:") {
+      return { cleanTitle, blocks, glossary, translated: false };
+    }
+
+    const lang = String(outputLang || "ru").toLowerCase().slice(0, 2);
+    const slots = [];
+    const pushSlot = (val, setter) => {
+      const str = String(val || "").trim();
+      if (!str || str.length < 2) return;
+      if (!this.needsTranslationForLang(str, lang)) return;
+      slots.push({ str, setter });
+    };
+
+    let outTitle = this.cleanForeignBrackets(cleanTitle, lang);
+    pushSlot(outTitle, (v) => { outTitle = v; });
+
+    const outGlossary = (glossary || []).map((g) => {
+      const item = { ...g };
+      // Сначала выбираем моноязычный вариант из двуязычного/трёхъязычного термина (напр. Self-Attention / Самовнимание (Өзіндік зейін))
+      const pickedTerm = this.pickTermForLang(item.term, lang);
+      item.term = pickedTerm || item.term;
+      item.plain = this.cleanForeignBrackets(item.plain, lang);
+      item.academic = this.cleanForeignBrackets(item.academic, lang);
+      item.example = this.cleanForeignBrackets(item.example, lang);
+
+      pushSlot(item.term, (v) => {
+        const cleanT = this.capitalizeFirst(v.split(/[/(]/)[0].trim());
+        item.term = cleanT || item.term;
+        const { dactylBoxes, signHint } = this.buildDactylAndSignHint(item.term);
+        item.dactylBoxes = dactylBoxes;
+        item.signHint = signHint;
+      });
+      pushSlot(item.plain, (v) => { item.plain = this.conciseDefinition(v); });
+      pushSlot(item.academic, (v) => { item.academic = this.cleanForeignBrackets(v, lang); });
+      pushSlot(item.example, (v) => { item.example = this.cleanForeignBrackets(v, lang); });
+      return item;
+    });
+
+    const outBlocks = (blocks || []).map((b) => {
+      const nb = {
+        ...b,
+        heading: this.cleanForeignBrackets(b.heading, lang),
+        body: this.cleanForeignBrackets(b.body, lang),
+        bullets: Array.isArray(b.bullets) ? b.bullets.map((x) => this.cleanForeignBrackets(x, lang)) : []
+      };
+      pushSlot(nb.heading, (v) => { nb.heading = v; });
+      pushSlot(nb.body, (v) => { nb.body = this.cleanForeignBrackets(v, lang); });
+      nb.bullets.forEach((bul, bIdx) => {
+        pushSlot(bul, (v) => { nb.bullets[bIdx] = this.cleanForeignBrackets(v, lang); });
+      });
+      return nb;
+    });
+
+    if (!slots.length) {
+      return { cleanTitle: outTitle, blocks: outBlocks, glossary: outGlossary, translated: true };
+    }
+
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 28000);
+      if (abortSignal) abortSignal.addEventListener("abort", () => ctrl.abort(), { once: true });
+
+      const resp = await fetch("/api/translate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: ctrl.signal,
+        body: JSON.stringify({
+          texts: slots.map((s) => s.str),
+          targetLang: lang,
+          sourceLang: "auto"
+        })
+      });
+      clearTimeout(timer);
+      if (!resp.ok) return { cleanTitle: outTitle, blocks: outBlocks, glossary: outGlossary, translated: false };
+      const data = await resp.json();
+      if (!Array.isArray(data?.translations)) {
+        return { cleanTitle: outTitle, blocks: outBlocks, glossary: outGlossary, translated: false };
+      }
+
+      slots.forEach((slot, idx) => {
+        const tr = data.translations[idx];
+        if (typeof tr === "string" && tr.trim()) {
+          slot.setter(tr.trim());
+        }
+      });
+
+      // Пересчитываем дактиль для терминов, которые не попали в слот перевода, но были выбраны через pickTermForLang
+      outGlossary.forEach((g) => {
+        const { dactylBoxes, signHint } = this.buildDactylAndSignHint(g.term);
+        g.dactylBoxes = dactylBoxes;
+        g.signHint = signHint;
+      });
+
+      return { cleanTitle: outTitle, blocks: outBlocks, glossary: outGlossary, translated: !data.fallback };
+    } catch (err) {
+      if (err?.name === "AbortError" && abortSignal?.aborted) throw err;
+      console.warn("Pre-pipeline source translation fallback:", err);
+      return { cleanTitle: outTitle, blocks: outBlocks, glossary: outGlossary, translated: false };
+    }
+  },
+
+  // Финальный контроль языковой чистоты: допереводит любые остаточные иноязычные поля (в т.ч. academicOriginal и ответ Gemini)
+  async ensurePackageLanguagePurity(pkg, targetLang, domainProfile, abortSignal = null) {
+    if (!pkg || !targetLang) return pkg;
+    if (typeof window !== "undefined" && window.location?.protocol === "file:") return pkg;
+    const lang = String(targetLang || "ru").toLowerCase().slice(0, 2);
+
+    const slots = [];
+    const checkAndPush = (val, setter) => {
+      const cleaned = this.cleanForeignBrackets(val, lang);
+      if (cleaned !== val) setter(cleaned);
+      if (cleaned && cleaned.length >= 2 && this.needsTranslationForLang(cleaned, lang)) {
+        slots.push({ str: cleaned, setter });
+      }
+    };
+
+    checkAndPush(pkg.courseTitle, (v) => { pkg.courseTitle = v; });
+
+    (pkg.glossary || []).forEach((g) => {
+      const picked = this.pickTermForLang(g.term, lang);
+      if (picked) g.term = picked;
+      checkAndPush(g.term, (v) => {
+        g.term = this.capitalizeFirst(v.split(/[/(]/)[0].trim()) || g.term;
+        const { dactylBoxes, signHint } = this.buildDactylAndSignHint(g.term);
+        g.dactylBoxes = dactylBoxes;
+        g.signHint = signHint;
+      });
+      checkAndPush(g.plain, (v) => { g.plain = v; });
+      checkAndPush(g.academic, (v) => { g.academic = v; });
+      checkAndPush(g.example, (v) => { g.example = v; });
+    });
+
+    (pkg.sections || []).forEach((sec) => {
+      checkAndPush(sec.title, (v) => { sec.title = v; });
+      checkAndPush(sec.academicOriginal, (v) => { sec.academicOriginal = v; });
+      if (sec.plainBlocks) {
+        checkAndPush(sec.plainBlocks.coreIdea, (v) => { sec.plainBlocks.coreIdea = v; });
+        checkAndPush(sec.plainBlocks.analogy, (v) => { sec.plainBlocks.analogy = v; });
+        (sec.plainBlocks.termBreakdown || []).forEach((tb) => {
+          const pt = this.pickTermForLang(tb.term, lang);
+          if (pt) tb.term = pt;
+          checkAndPush(tb.term, (v) => { tb.term = v; });
+          checkAndPush(tb.plain, (v) => { tb.plain = v; });
+        });
+      }
+      if (Array.isArray(sec.plainBullets)) {
+        sec.plainBullets.forEach((b, bIdx) => {
+          checkAndPush(b, (v) => { sec.plainBullets[bIdx] = v; });
+        });
+      }
+      checkAndPush(sec.plainSummary, (v) => { sec.plainSummary = v; });
+    });
+
+    (pkg.scenes || []).forEach((sc) => {
+      checkAndPush(sc.title, (v) => { sc.title = v; });
+      const kt = this.pickTermForLang(sc.keyTerm, lang);
+      if (kt) sc.keyTerm = kt;
+      checkAndPush(sc.keyTerm, (v) => { sc.keyTerm = v; });
+      checkAndPush(sc.keyPlain, (v) => { sc.keyPlain = v; });
+      checkAndPush(sc.sectionRef, (v) => { sc.sectionRef = this.shortLabel(v, 48); });
+      (sc.beats || []).forEach((bt) => {
+        checkAndPush(bt.text, (v) => { bt.text = this.ensureCompleteSentence(v, 145); });
+      });
+      (sc.visualPayload?.stages || []).forEach((st) => {
+        checkAndPush(st.shortTitle, (v) => { st.shortTitle = this.shortLabel(v, 28); });
+        checkAndPush(st.detail, (v) => { st.detail = this.shortLabel(v, 68); });
+        checkAndPush(st.metric, (v) => { st.metric = this.shortLabel(v, 24); });
+      });
+      (sc.visualPayload?.rings || []).forEach((rg) => {
+        checkAndPush(rg.name, (v) => { rg.name = this.shortLabel(v, 28); });
+        checkAndPush(rg.role, (v) => { rg.role = this.shortLabel(v, 48); });
+      });
+      (sc.visualPayload?.constellationNodes || []).forEach((cn) => {
+        checkAndPush(cn.term, (v) => { cn.term = this.shortLabel(v, 26); });
+        checkAndPush(cn.tag, (v) => { cn.tag = this.shortLabel(v, 36); });
+      });
+      const cmp = sc.visualPayload?.facts?.comparison;
+      if (cmp) {
+        checkAndPush(cmp.leftTitle, (v) => { cmp.leftTitle = v; });
+        checkAndPush(cmp.leftNote, (v) => { cmp.leftNote = v; });
+        checkAndPush(cmp.rightTitle, (v) => { cmp.rightTitle = v; });
+        checkAndPush(cmp.rightNote, (v) => { cmp.rightNote = v; });
+      }
+      const ce = sc.visualPayload?.facts?.causeEffect;
+      if (ce) {
+        checkAndPush(ce.causeLabel, (v) => { ce.causeLabel = this.shortLabel(v, 62); });
+        checkAndPush(ce.mechanismLabel, (v) => { ce.mechanismLabel = this.shortLabel(v, 28); });
+        checkAndPush(ce.effectLabel, (v) => { ce.effectLabel = this.shortLabel(v, 66); });
+      }
+      const we = sc.visualPayload?.facts?.workedExample;
+      if (we) {
+        checkAndPush(we.caseTitle, (v) => { we.caseTitle = this.shortLabel(v, 52); });
+        checkAndPush(we.outputValue, (v) => { we.outputValue = this.shortLabel(v, 26); });
+        checkAndPush(we.verdict, (v) => { we.verdict = this.shortLabel(v, 74); });
+      }
+      const cc = sc.visualPayload?.facts?.causalCurve;
+      if (cc) {
+        checkAndPush(cc.paramA, (v) => { cc.paramA = this.shortLabel(v, 26); });
+        checkAndPush(cc.paramB, (v) => { cc.paramB = this.shortLabel(v, 28); });
+        checkAndPush(cc.takeaway, (v) => { cc.takeaway = this.shortLabel(v, 70); });
+      }
+    });
+
+    (pkg.quiz || []).forEach((q) => {
+      checkAndPush(q.question, (v) => { q.question = v; });
+      (q.options || []).forEach((opt, oIdx) => {
+        checkAndPush(opt, (v) => { q.options[oIdx] = v; });
+      });
+      checkAndPush(q.explanation, (v) => { q.explanation = v; });
+      checkAndPush(q.hint, (v) => { q.hint = v; });
+    });
+
+    if (!slots.length) return pkg;
+
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 24000);
+      if (abortSignal) abortSignal.addEventListener("abort", () => ctrl.abort(), { once: true });
+
+      const resp = await fetch("/api/translate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: ctrl.signal,
+        body: JSON.stringify({
+          texts: slots.map((s) => s.str),
+          targetLang: lang,
+          sourceLang: "auto"
+        })
+      });
+      clearTimeout(timer);
+      if (!resp.ok) return pkg;
+      const data = await resp.json();
+      if (!Array.isArray(data?.translations)) return pkg;
+
+      slots.forEach((slot, idx) => {
+        const tr = data.translations[idx];
+        if (typeof tr === "string" && tr.trim()) {
+          slot.setter(this.cleanForeignBrackets(tr.trim(), lang));
+        }
+      });
+
+      const vd = window.LectureVisualDirector;
+      (pkg.scenes || []).forEach((sc) => {
+        this.auditSceneGeometryAndContrast(sc, domainProfile?.theme);
+        sc.durationSec = vd
+          ? vd.computeCalmDurationSec(sc.caption, 12.0, 12.0, sc.preRollSec || 0.8, sc.postRollSec || 1.4)
+          : Math.max(12.0, +(0.8 + sc.caption.length / 11.8 + 1.4).toFixed(1));
+        sc.finalCps = +(sc.caption.length / sc.durationSec).toFixed(1);
+      });
+    } catch (err) {
+      if (err?.name === "AbortError" && abortSignal?.aborted) throw err;
+      console.warn("Language purity check warning:", err);
+    }
+    return pkg;
   },
 
   // Пакетный перевод всего учебного пакета (конспект, термины, сцены 2D-мультфильма, тест) через /api/translate
@@ -2339,13 +2668,36 @@ export const LectureComposition: React.FC = () => (
 
   // Главный запуск полного пайплайна (объясняющие конспекты, динамический тест, 2D-видео)
   async runFullPipeline({ courseTitle, glossaryText, lectureText, geminiApiKey, outputLang = "ru", abortSignal = null }) {
-    const { cleanTitle, cleanText } = this.sanitizeAndExtractMeta(courseTitle, lectureText);
+    let { cleanTitle, cleanText } = this.sanitizeAndExtractMeta(courseTitle, lectureText);
     const sourceLang = this.detectTextLanguage(cleanText + " " + cleanTitle);
     const contentHash = await this.computeContentHash(cleanTitle, glossaryText || "", cleanText, outputLang);
 
     const segmented = this.segmentLectureIntoSections(cleanText);
     const domainProfile = this.detectDomainProfile(cleanTitle, segmented.coreText, glossaryText);
     let glossary = this.parseGlossary(glossaryText, cleanText, segmented.embeddedGlossaryLines);
+    const hasGeminiKey = Boolean(geminiApiKey && geminiApiKey.trim().startsWith("AIza"));
+    const pipelineWarnings = [];
+
+    // Если работаем без Gemini API (или смешанный материал), переводим исходные блоки и термины ДО сборки сцен и теста
+    let preTranslated = false;
+    if (!hasGeminiKey && (outputLang !== sourceLang || this.needsTranslationForLang(cleanTitle + " " + segmented.coreText.slice(0, 600) + " " + glossaryText, outputLang))) {
+      const preRes = await this.translateSourceMaterialViaServer({
+        cleanTitle,
+        blocks: segmented.blocks,
+        glossary,
+        outputLang,
+        abortSignal
+      });
+      cleanTitle = preRes.cleanTitle || cleanTitle;
+      segmented.blocks = preRes.blocks || segmented.blocks;
+      segmented.coreText = segmented.blocks.map((b) => (b.heading ? `${b.heading}. ${b.body}` : b.body)).join("\n\n");
+      glossary = preRes.glossary || glossary;
+      preTranslated = Boolean(preRes.translated);
+      if (!preTranslated) {
+        pipelineWarnings.push("Сервер перевода временно недоступен — часть материала могла остаться на языке оригинала.");
+      }
+    }
+
     const sections = segmented.blocks.map((b, idx) => this.simplifyToPlainLanguage(b, glossary, idx, domainProfile, outputLang));
     const seenSecTitles = new Set();
     sections.forEach((sec, idx) => {
@@ -2380,8 +2732,7 @@ export const LectureComposition: React.FC = () => (
     const targetQuizCount = quiz.length;
 
     let usedCloudModel = false;
-    const pipelineWarnings = [];
-    if (geminiApiKey && geminiApiKey.trim().startsWith("AIza")) {
+    if (hasGeminiKey) {
       const langNames = {
         ru: "Russian (Русский)",
         kk: "Kazakh (Қазақша, strict Cyrillic ә, і, ң, ғ, ү, ұ, қ, ө, һ)",
@@ -2726,11 +3077,8 @@ ${segmented.coreText.slice(0, 9000)}`
       warnings: pipelineWarnings
     };
 
-    if (!usedCloudModel && outputLang !== sourceLang) {
-      const trRes = await this.translatePackageViaServer(pkgOut, sourceLang, outputLang, domainProfile, abortSignal);
-      if (trRes && trRes.translated === false) {
-        pipelineWarnings.push("Сервер перевода недоступен — часть текста осталась на языке оригинала.");
-      }
+    if (outputLang !== sourceLang || !preTranslated) {
+      await this.ensurePackageLanguagePurity(pkgOut, outputLang, domainProfile, abortSignal);
       const finTranslated = this.finalizeStoryboardLogsAndCode(
         pkgOut.courseTitle,
         domainProfile,

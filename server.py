@@ -30,6 +30,7 @@ import ssl
 import base64
 import socket
 from collections import OrderedDict
+from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import urlparse, unquote, urlencode, quote
 from urllib.request import Request, urlopen
 from xml.etree import ElementTree as ET
@@ -70,11 +71,23 @@ def _google_translate_raw(text, target_lang, source_lang="auto"):
     tl = "kk" if str(target_lang).lower().startswith("kk") else ("en" if str(target_lang).lower().startswith("en") else "ru")
     sl = "auto" if not source_lang or source_lang == "auto" else ("kk" if str(source_lang).lower().startswith("kk") else ("en" if str(source_lang).lower().startswith("en") else "ru"))
 
-    # 1. Основной быстрый канал: clients5.google.com/translate_a/t
+    # Если в тексте смешаны алфавиты (например RU+KK или RU+EN), принудительно используем sl="auto",
+    # чтобы Google Translate не транслитерировал казахский текст по правилам русского языка
+    if sl != "auto":
+        has_kk = bool(re.search(r"[әіңғүұқөһӘІҢҒҮҰҚӨҺ]", text))
+        has_lat = bool(re.search(r"[A-Za-z]{3,}", text))
+        has_cyr = bool(re.search(r"[А-Яа-яЁё]{3,}", text))
+        if (sl == "ru" and (has_kk or has_lat)) or (sl == "kk" and has_lat) or (sl == "en" and (has_cyr or has_kk)):
+            sl = "auto"
+
+    # 1. Основной быстрый канал: clients5.google.com/translate_a/t (POST для длинных текстов)
     try:
-        qs = urlencode({"client": "dict-chrome-ex", "sl": sl, "tl": tl, "q": text})
-        url = f"https://clients5.google.com/translate_a/t?{qs}"
-        req = Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        form_data = urlencode({"client": "dict-chrome-ex", "sl": sl, "tl": tl, "q": text}).encode("utf-8")
+        req = Request(
+            "https://clients5.google.com/translate_a/t",
+            data=form_data,
+            headers={"User-Agent": "Mozilla/5.0", "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8"}
+        )
         with urlopen(req, timeout=8, context=SSL_CONTEXT) as resp:
             data = json.loads(resp.read().decode("utf-8"))
         if isinstance(data, list) and data:
@@ -88,9 +101,12 @@ def _google_translate_raw(text, target_lang, source_lang="auto"):
 
     # 2. Резервный канал: translate.googleapis.com
     try:
-        qs = urlencode({"client": "gtx", "sl": sl, "tl": tl, "dt": "t", "q": text})
-        url = f"https://translate.googleapis.com/translate_a/single?{qs}"
-        req = Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        form_data = urlencode({"client": "gtx", "sl": sl, "tl": tl, "dt": "t", "q": text}).encode("utf-8")
+        req = Request(
+            "https://translate.googleapis.com/translate_a/single",
+            data=form_data,
+            headers={"User-Agent": "Mozilla/5.0", "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8"}
+        )
         with urlopen(req, timeout=8, context=SSL_CONTEXT) as resp:
             data = json.loads(resp.read().decode("utf-8"))
         if isinstance(data, list) and data and isinstance(data[0], list):
@@ -103,14 +119,15 @@ def _google_translate_raw(text, target_lang, source_lang="auto"):
     # 3. Запасной канал: MyMemory (для коротких фраз до 450 симв.)
     if len(text) <= 450:
         pair_sl = "ru" if sl == "auto" else sl
-        qs = urlencode({"q": text, "langpair": f"{pair_sl}|{tl}"})
-        url = f"https://api.mymemory.translated.net/get?{qs}"
-        req = Request(url, headers={"User-Agent": "Mozilla/5.0"})
-        with urlopen(req, timeout=8, context=SSL_CONTEXT) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-        tr = (data.get("responseData") or {}).get("translatedText")
-        if isinstance(tr, str) and tr.strip():
-            return tr.strip()
+        if pair_sl != tl:
+            qs = urlencode({"q": text, "langpair": f"{pair_sl}|{tl}"})
+            url = f"https://api.mymemory.translated.net/get?{qs}"
+            req = Request(url, headers={"User-Agent": "Mozilla/5.0"})
+            with urlopen(req, timeout=8, context=SSL_CONTEXT) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+            tr = (data.get("responseData") or {}).get("translatedText")
+            if isinstance(tr, str) and tr.strip():
+                return tr.strip()
 
     raise RuntimeError("All translation providers failed")
 
@@ -139,63 +156,120 @@ def translate_texts_cached(texts, target_lang="ru", source_lang="auto"):
     if not missing_indices:
         return out, False
 
-    sep = "\n###LAI_SEP###\n"
-    sep_re = re.compile(r"\s*#+\s*LAI_SEP\s*#+\s*", re.IGNORECASE)
     used_fallback = False
 
-    chunks = []
-    cur_chunk = []
-    cur_len = 0
+    def _detect_snippet_lang(txt):
+        kk_n = len(re.findall(r"[әіңғүұқөһӘІҢҒҮҰҚӨҺ]", txt))
+        cyr_n = len(re.findall(r"[а-яёА-ЯЁ]", txt))
+        lat_n = len(re.findall(r"[A-Za-z]", txt))
+        if kk_n >= 2:
+            return "kk"
+        if lat_n > (cyr_n + kk_n) * 1.4 and lat_n >= 8:
+            return "en"
+        if cyr_n >= 2:
+            return "ru"
+        return "auto"
+
+    # Группируем строки по исходному языку в однородные чанки, чтобы переводчик никогда не применял русскую модель к казахским строкам
+    grouped_indices = {"kk": [], "ru": [], "en": [], "auto": []}
     for idx in missing_indices:
-        s = out[idx].strip()
-        add_len = len(s) + len(sep)
-        if cur_chunk and cur_len + add_len > 1800:
-            chunks.append(cur_chunk)
-            cur_chunk = [idx]
-            cur_len = len(s)
-        else:
-            cur_chunk.append(idx)
-            cur_len += add_len
-    if cur_chunk:
-        chunks.append(cur_chunk)
+        g_lang = _detect_snippet_lang(out[idx].strip())
+        grouped_indices[g_lang].append(idx)
 
-    for chunk in chunks:
-        joined = sep.join(out[i].strip() for i in chunk)
-        translated_parts = None
-        ok_flags = None
+    chunks = []  # list of (chunk_sl, [indices])
+    for g_lang, idx_list in grouped_indices.items():
+        if not idx_list:
+            continue
+        cur_chunk = []
+        cur_len = 0
+        for idx in idx_list:
+            s = out[idx].strip()
+            add_len = len(s) + 12
+            if cur_chunk and (cur_len + add_len > 2200 or len(cur_chunk) >= 18):
+                chunks.append((g_lang, cur_chunk))
+                cur_chunk = [idx]
+                cur_len = len(s)
+            else:
+                cur_chunk.append(idx)
+                cur_len += add_len
+        if cur_chunk:
+            chunks.append((g_lang, cur_chunk))
+
+    marker_re = re.compile(r"\[\s*\[\s*(9\d{3})\s*\]\s*\]")
+
+    def _translate_chunk(chunk_pair):
+        nonlocal used_fallback
+        chunk_sl, chunk = chunk_pair
+        eff_sl = chunk_sl if chunk_sl in ("kk", "ru", "en") else sl
+        if eff_sl == tl:
+            return [(idx0, out[idx0].strip(), True) for idx0 in chunk]
+        if len(chunk) == 1:
+            idx0 = chunk[0]
+            try:
+                return [(idx0, _google_translate_raw(out[idx0].strip(), tl, eff_sl), True)]
+            except Exception:
+                used_fallback = True
+                return [(idx0, out[idx0], False)]
+
+        tagged_parts = [f"[[{9000 + pos}]]\n{out[i].strip()}" for pos, i in enumerate(chunk)]
+        joined = "\n".join(tagged_parts)
+        parsed_map = {}
         try:
-            joined_tr = _google_translate_raw(joined, tl, sl)
-            parts = sep_re.split(joined_tr)
-            if len(parts) == len(chunk):
-                translated_parts = [p.strip() for p in parts]
-                ok_flags = [True] * len(chunk)
+            joined_tr = _google_translate_raw(joined, tl, eff_sl)
+            matches = list(marker_re.finditer(joined_tr))
+            if len(matches) == len(chunk):
+                for m_idx, m in enumerate(matches):
+                    code = int(m.group(1)) - 9000
+                    if 0 <= code < len(chunk):
+                        start_pos = m.end()
+                        end_pos = matches[m_idx + 1].start() if m_idx + 1 < len(matches) else len(joined_tr)
+                        parsed_map[code] = joined_tr[start_pos:end_pos].strip()
         except Exception:
-            pass
+            parsed_map = {}
 
-        if translated_parts is None:
-            translated_parts = []
-            ok_flags = []
-            for i in chunk:
-                try:
-                    translated_parts.append(_google_translate_raw(out[i].strip(), tl, sl))
-                    ok_flags.append(True)
-                except Exception:
-                    used_fallback = True
-                    translated_parts.append(out[i])
-                    ok_flags.append(False)
+        if len(parsed_map) == len(chunk) and all(parsed_map.get(pos) for pos in range(len(chunk))):
+            return [(chunk[pos], parsed_map[pos], True) for pos in range(len(chunk))]
 
-        with TRANSLATE_CACHE_LOCK:
-            for i, tr, ok in zip(chunk, translated_parts, ok_flags):
-                orig_s = out[i].strip()
-                final_tr = tr or orig_s
-                out[i] = final_tr
-                # Кэшируем ТОЛЬКО реально переведённые строки (никогда не кэшируем ошибку!)
-                if ok and final_tr:
-                    ck = (sl, tl, orig_s)
-                    TRANSLATE_CACHE[ck] = final_tr
-                    TRANSLATE_CACHE.move_to_end(ck)
-                    while len(TRANSLATE_CACHE) > TRANSLATE_CACHE_MAX:
-                        TRANSLATE_CACHE.popitem(last=False)
+        # Быстрый параллельный fallback только для неразобранных строк чанка
+        results = []
+        missing_pos = [pos for pos in range(len(chunk)) if not parsed_map.get(pos)]
+        if missing_pos:
+            with ThreadPoolExecutor(max_workers=min(5, len(missing_pos))) as pool:
+                futs = {pos: pool.submit(_google_translate_raw, out[chunk[pos]].strip(), tl, eff_sl) for pos in missing_pos}
+                for pos, fut in futs.items():
+                    try:
+                        parsed_map[pos] = fut.result(timeout=10)
+                    except Exception:
+                        used_fallback = True
+                        parsed_map[pos] = None
+
+        for pos, i in enumerate(chunk):
+            val = parsed_map.get(pos)
+            if val:
+                results.append((i, val, True))
+            else:
+                results.append((i, out[i], False))
+        return results
+
+    chunk_results = []
+    if len(chunks) > 1:
+        with ThreadPoolExecutor(max_workers=min(4, len(chunks))) as chunk_pool:
+            for res_list in chunk_pool.map(_translate_chunk, chunks):
+                chunk_results.extend(res_list)
+    else:
+        chunk_results.extend(_translate_chunk(chunks[0]))
+
+    with TRANSLATE_CACHE_LOCK:
+        for i, tr, ok in chunk_results:
+            orig_s = out[i].strip()
+            final_tr = (tr or orig_s).strip()
+            out[i] = final_tr
+            if ok and final_tr:
+                ck = (sl, tl, orig_s)
+                TRANSLATE_CACHE[ck] = final_tr
+                TRANSLATE_CACHE.move_to_end(ck)
+                while len(TRANSLATE_CACHE) > TRANSLATE_CACHE_MAX:
+                    TRANSLATE_CACHE.popitem(last=False)
 
     return out, used_fallback
 
@@ -205,11 +279,17 @@ def clean_tts_text(raw_text, lang="ru"):
     l = str(lang or "ru").lower()
     text = re.sub(r"[\u200b-\u200f\ufeff]", "", text)
 
-    # Убираем иноязычные дубли в скобках, чтобы диктор не ломал дикцию на чужом алфавите
+    # Убираем иноязычные дубли в скобках и случайные чужие слова, чтобы диктор не смешивал языки
     if l.startswith("ru"):
         text = re.sub(r"\([^)]*[әіңғүұқөһӘІҢҒҮҰҚӨҺ][^)]*\)", " ", text)
+        text = re.sub(r"\([^)]*[A-Za-z]{4,}[^)]*\)", " ", text)
     elif l.startswith("kk"):
         text = re.sub(r"\([^)]*[А-Яа-яЁё]{3,}[^)]*\)", lambda m: m.group(0) if re.search(r"[әіңғүұқөһӘІҢҒҮҰҚӨҺ]", m.group(0)) else " ", text)
+        text = re.sub(r"\([^)]*[A-Za-z]{3,}[^)]*\)", " ", text)
+    elif l.startswith("en"):
+        text = re.sub(r"\([^)]*[А-Яа-яЁёӘәІіҢңҒғҮүҰұҚқӨөҺһ]{2,}[^)]*\)", " ", text)
+        # Если в английской озвучке случайно проскочили кириллические слова — убираем их, чтобы голос не замолкал и не ломал дикцию
+        text = re.sub(r"\b[А-Яа-яЁёӘәІіҢңҒғҮүҰұҚқӨөҺһ]+\b", " ", text)
 
     # Убираем кавычки без искусственных запятых, чтобы речь звучала плавно
     text = text.replace("[", " ").replace("]", " ").replace('"', " ").replace("«", " ").replace("»", " ")
@@ -225,6 +305,12 @@ def clean_tts_text(raw_text, lang="ru"):
         text = re.sub(r"(\d+)\s*%", r"\1 пайыз", text)
         text = re.sub(r"\bWCAG\b", "қолжетімділік стандарты", text, flags=re.IGNORECASE)
         text = re.sub(r"\bFPS\b", "секундына кадр", text, flags=re.IGNORECASE)
+        text = re.sub(r"\bSelf-Attention\b", "өзіндік зейін", text, flags=re.IGNORECASE)
+        text = re.sub(r"\bAI\b", "жасанды интеллект", text)
+        text = re.sub(r"\bRAG\b", "РАГ", text)
+        text = re.sub(r"\bLTV\b", "Эл Ти Ви", text)
+        text = re.sub(r"\bCAC\b", "Си Эй Си", text)
+        text = re.sub(r"\bSingle-Pass\b", "бір өту", text, flags=re.IGNORECASE)
     elif l.startswith("en"):
         text = text.replace("≈", " approximately equals ").replace("≠", " does not equal ").replace("≥", " at least ").replace("≤", " at most ")
         text = re.sub(r"(\d+)\s*:\s*(\d+)", r"\1 to \2", text)
@@ -492,7 +578,7 @@ def _purge_fallback_disk_cache():
 
 def synthesize_tts_cached(text, voice, rate="+0%", pitch="+0Hz", volume="+0%", lang="ru"):
     global TTS_CIRCUIT_OPEN_UNTIL, TTS_CONSECUTIVE_FAILS
-    key = hashlib.sha256(f"v3::{voice}::{rate}::{pitch}::{volume}::{text}".encode("utf-8")).hexdigest()
+    key = hashlib.sha256(f"v4::{voice}::{rate}::{pitch}::{volume}::{text}".encode("utf-8")).hexdigest()
     event = None
     is_owner = False
 
@@ -548,11 +634,10 @@ def synthesize_tts_cached(text, voice, rate="+0%", pitch="+0Hz", volume="+0%", l
 
             edge_allowed = edge_tts is not None and time.time() >= TTS_CIRCUIT_OPEN_UNTIL
             if edge_allowed:
-                is_male_voice = any(m in voice for m in ("Dmitry", "Daulet", "Andrew"))
-                fallback_neural = "en-US-AndrewMultilingualNeural" if is_male_voice else "en-US-AvaMultilingualNeural"
+                # Никогда не подменяем казахский/русский голос на американский MultilingualNeural — только родной голос языка!
                 retry_delays = (0.35, 0.7, 1.2, 1.8, 2.5, 0.0)
                 for attempt in range(6):
-                    cur_voice = voice if attempt < 5 else fallback_neural
+                    cur_voice = voice
                     try:
                         send_txt = cur_text if attempt % 2 == 0 else re.sub(r"[^0-9A-Za-zА-Яа-яЁёӘәІіҢңҒғҮүҰұҚқӨөҺһ.,;:!?…\s-]", " ", cur_text)
                         send_txt = re.sub(r"\s+", " ", send_txt).strip()
@@ -1347,7 +1432,7 @@ class LectureAIHandler(http.server.SimpleHTTPRequestHandler):
             source_lang = str(payload.get("sourceLang") or "auto")
             if not isinstance(texts, list):
                 return self.send_json(400, {"error": "texts must be an array"})
-            translations, used_fallback = translate_texts_cached(texts[:180], target_lang, source_lang)
+            translations, used_fallback = translate_texts_cached(texts[:500], target_lang, source_lang)
             return self.send_json(200, {"translations": translations, "fallback": used_fallback})
 
         if parsed.path == "/api/tts":

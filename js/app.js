@@ -1713,6 +1713,167 @@
     });
   }
 
+  function getResultUiLabels(langOverride = null) {
+    const l = String(langOverride || state.pipelineResult?.outputLang || state.outputLang || "ru").toLowerCase().slice(0, 2);
+    if (l === "kk") {
+      return {
+        scenesHeader: (n) => `Бейне көріністері (${n})`,
+        sceneOf: (i, n) => `${i}/${n}-көрініс`,
+        scenePrefix: "Көрініс",
+        cpsUnit: "таңба/с",
+        secUnit: "с",
+        beatWord: "Бит",
+        layouts: { wide_stage: "Кең кадр", hero_intro: "Кіріспе", split_tutor: "Тьютор", focus_split: "Фокус" },
+        coreIdea: "Негізгі ой",
+        analogy: "Өмірден мысал",
+        takeaways: "Есте сақтау",
+        notePlaceholder: "Осы бөлім бойынша жеке жазбаңыз...",
+        openInVideo: "Осы тақырыпты бейнеден ашу",
+        openTermCard: "Термин карточкасын ашу",
+        noTermsFound: (q) => `«${q}» сұрауы бойынша терминдер табылмады.`,
+        fcList: "Сөздік тізімі",
+        fcCards: "Карточкалар",
+        fcAnswer: "АЙҚЫН ТІЛДЕГІ ЖАУАП",
+        fcCardOf: (i, t) => `${i}/${t}-КАРТОЧКА · ЖАУАП ҮШІН БАСЫҢЫЗ`,
+        fcPrompt: "Мағынасын өз сөзіңізбен еске түсіріп, карточканы басыңыз",
+        fcPrev: "← Алдыңғы",
+        fcHide: "Жауапты жасыру",
+        fcShow: "Жауапты көрсету",
+        fcNext: "Келесі →",
+        mmRootBadge: "КУРСТЫҢ НЕГІЗГІ ТАҚЫРЫБЫ",
+        mmRootPlain: "Дәрістің барлық бөлімдері мен негізгі терминдеріне шолу.",
+        mmRootExtra: (s, t) => `Бөлімдер: ${s} · Терминдер: ${t}`,
+        mmSecWord: "БӨЛІМ",
+        mmTermBadge: (s) => `ТЕРМИН · ${s || "СИЛЛАБУС"}`,
+        mmPlainLabel: "Қарапайым сөзбен:",
+        mmExampleLabel: "Мысал:",
+        mmExamLabel: "Емтихан үшін:",
+        mmGotoScene: (n) => `Бейнеден көру (${n}-көрініс)`,
+        quizFull: (n) => `Толық тест (${n})`,
+        quizPrompt: (n) => `${n} сұраққа жауап беріп, «Жауаптарды тексеру» батырмасын басыңыз`,
+        quizHintBtn: "Кеңес",
+        quizLetters: ["А", "Б", "В", "Г"],
+        quizRepeatScene: (n) => `${n}-көріністе қайталау`,
+        quizCorrect: "✓ Дұрыс",
+        quizSkipped: "Жауапсыз",
+        quizWrong: "✕ Қате",
+        quizYourRight: "✓ Сіздің таңдау · Дұрыс",
+        quizRight: "✓ Дұрыс жауап",
+        quizYourWrong: "✕ Сіздің таңдау",
+        quizDiffSkipped: (c) => `Сұрақ өткізіп алынды. Дұрыс жауап: «${c}»`,
+        quizDiffWrong: (ch, c) => `✕ Таңдалды: ${ch} → Дұрыс жауап: «${c}»`,
+        quizScore: (c, t, p) => `Дұрыс: ${c} / ${t} (${p}%)`,
+        quizErrors: (n) => `Қателер: ${n}`,
+        quizSkippedCount: (n) => `Өткізілген: ${n}`,
+        quizFilterErrors: (n) => `Тек қателер (${n})`
+      };
+    }
+    if (l === "en") {
+      return {
+        scenesHeader: (n) => `Video Scenes (${n})`,
+        sceneOf: (i, n) => `Scene ${i} of ${n}`,
+        scenePrefix: "Scene",
+        cpsUnit: "CPS",
+        secUnit: "s",
+        beatWord: "Part",
+        layouts: { wide_stage: "Wide", hero_intro: "Hero", split_tutor: "Tutor", focus_split: "Focus" },
+        coreIdea: "Core Idea",
+        analogy: "Real-Life Analogy",
+        takeaways: "Key Takeaways",
+        notePlaceholder: "Your personal note for this section...",
+        openInVideo: "Jump to this topic in video",
+        openTermCard: "Open term card",
+        noTermsFound: (q) => `No terms found for "${q}".`,
+        fcList: "Glossary List",
+        fcCards: "Flashcards",
+        fcAnswer: "PLAIN LANGUAGE ANSWER",
+        fcCardOf: (i, t) => `CARD ${i} OF ${t} · CLICK TO FLIP`,
+        fcPrompt: "Recall the meaning in your own words, then click the card",
+        fcPrev: "← Prev",
+        fcHide: "Hide Answer",
+        fcShow: "Show Answer",
+        fcNext: "Next →",
+        mmRootBadge: "MAIN COURSE TOPIC",
+        mmRootPlain: "Overview of all lecture sections and core concepts.",
+        mmRootExtra: (s, t) => `Sections: ${s} · Terms: ${t}`,
+        mmSecWord: "SECTION",
+        mmTermBadge: (s) => `TERM · ${s || "SYLLABUS"}`,
+        mmPlainLabel: "In plain words:",
+        mmExampleLabel: "Analogy:",
+        mmExamLabel: "For the exam:",
+        mmGotoScene: (n) => `Watch in video (Scene ${n})`,
+        quizFull: (n) => `Full Quiz (${n})`,
+        quizPrompt: (n) => `Answer ${n} questions and click "Check Answers"`,
+        quizHintBtn: "Hint",
+        quizLetters: ["A", "B", "C", "D"],
+        quizRepeatScene: (n) => `Review in Scene ${n}`,
+        quizCorrect: "✓ Correct",
+        quizSkipped: "Unanswered",
+        quizWrong: "✕ Incorrect",
+        quizYourRight: "✓ Your pick · Correct",
+        quizRight: "✓ Correct answer",
+        quizYourWrong: "✕ Your pick",
+        quizDiffSkipped: (c) => `Question skipped. Correct answer: "${c}"`,
+        quizDiffWrong: (ch, c) => `✕ You chose: ${ch} → Correct answer: "${c}"`,
+        quizScore: (c, t, p) => `Correct: ${c} of ${t} (${p}%)`,
+        quizErrors: (n) => `Incorrect: ${n}`,
+        quizSkippedCount: (n) => `Skipped: ${n}`,
+        quizFilterErrors: (n) => `Mistakes only (${n})`
+      };
+    }
+    return {
+      scenesHeader: (n) => `Сцены видео (${n})`,
+      sceneOf: (i, n) => `Сцена ${i} из ${n}`,
+      scenePrefix: "Сцена",
+      cpsUnit: "симв/с",
+      secUnit: "с",
+      beatWord: "Бит",
+      layouts: { wide_stage: "Wide", hero_intro: "Hero", split_tutor: "Тьютор", focus_split: "Зеркально" },
+      coreIdea: "Главная мысль",
+      analogy: "Пример из жизни",
+      takeaways: "Что запомнить",
+      notePlaceholder: "Ваша личная заметка к этому разделу...",
+      openInVideo: "Открыть эту тему в видео",
+      openTermCard: "Открыть карточку термина",
+      noTermsFound: (q) => `По запросу «${q}» терминов не найдено.`,
+      fcList: "Список словаря",
+      fcCards: "Карточки",
+      fcAnswer: "ОТВЕТ НА ЯСНОМ ЯЗЫКЕ",
+      fcCardOf: (i, t) => `КАРТОЧКА ${i} ИЗ ${t} · НАЖМИТЕ ДЛЯ ОТВЕТА`,
+      fcPrompt: "Попробуйте вспомнить смысл своими словами, затем нажмите на карточку",
+      fcPrev: "← Пред.",
+      fcHide: "Скрыть ответ",
+      fcShow: "Показать ответ",
+      fcNext: "След. →",
+      mmRootBadge: "ГЛАВНАЯ ТЕМА КУРСА",
+      mmRootPlain: "Обзор всех разделов и ключевых терминов лекции.",
+      mmRootExtra: (s, t) => `Разделов: ${s} · Терминов: ${t}`,
+      mmSecWord: "РАЗДЕЛ",
+      mmTermBadge: (s) => `ТЕРМИН · ${s || "СИЛЛАБУС"}`,
+      mmPlainLabel: "Простыми словами:",
+      mmExampleLabel: "Пример:",
+      mmExamLabel: "Для экзамена:",
+      mmGotoScene: (n) => `Показать в видео (Сцена ${n})`,
+      quizFull: (n) => `Полный тест (${n})`,
+      quizPrompt: (n) => `Ответьте на ${n} вопр. и нажмите «Проверить ответы»`,
+      quizHintBtn: "Подсказка",
+      quizLetters: ["А", "Б", "В", "Г"],
+      quizRepeatScene: (n) => `Повторить в Сцене ${n}`,
+      quizCorrect: "✓ Верно",
+      quizSkipped: "Без ответа",
+      quizWrong: "✕ Ошибка",
+      quizYourRight: "✓ Ваш выбор · Верно",
+      quizRight: "✓ Верный ответ",
+      quizYourWrong: "✕ Ваш выбор",
+      quizDiffSkipped: (c) => `Вы пропустили вопрос. Верный ответ: «${c}»`,
+      quizDiffWrong: (ch, c) => `✕ Вы выбрали: ${ch} → Верный ответ: «${c}»`,
+      quizScore: (c, t, p) => `Верно: ${c} из ${t} (${p}%)`,
+      quizErrors: (n) => `Ошибок: ${n}`,
+      quizSkippedCount: (n) => `Пропущено: ${n}`,
+      quizFilterErrors: (n) => `Только ошибки (${n})`
+    };
+  }
+
   // 7. Отрисовка всех 4 студенческих вкладок и модалки контроля ИИ (вызывается строго после 100% готовности!)
   function renderResultsAll(res, isCacheHit) {
     if (state.animEngine) {
@@ -1741,33 +1902,30 @@
         : "Отчёт проверки и код";
     }
 
+    const uiL = getResultUiLabels(res.outputLang);
     const sbHeader = document.querySelector(".storyboard-header h3");
-    if (sbHeader) sbHeader.textContent = `Сцены видео (${res.scenes.length})`;
+    if (sbHeader) sbHeader.textContent = uiL.scenesHeader(res.scenes.length);
 
-    renderStoryboardList(res.scenes);
+    renderStoryboardList(res.scenes, res.outputLang);
     renderNotesAndGlossary(res);
     renderTwoLevelMindMapSVG(res);
     renderQuiz(res.quiz);
     renderSupervisorTab(res);
   }
 
-  function renderStoryboardList(scenes) {
-    const layoutTagMap = {
-      wide_stage: "Wide",
-      hero_intro: "Hero",
-      split_tutor: "Тьютор",
-      focus_split: "Зеркально"
-    };
+  function renderStoryboardList(scenes, langOverride = null) {
+    const uiL = getResultUiLabels(langOverride);
+    const layoutTagMap = uiL.layouts;
     const container = document.getElementById("storyboardList");
     container.innerHTML = scenes
       .map(
         (s, idx) => {
-          const layoutLabel = layoutTagMap[s.layoutMode] || "Тьютор";
+          const layoutLabel = layoutTagMap[s.layoutMode] || layoutTagMap.split_tutor;
           return `
       <div class="scene-card ${idx === 0 ? "active" : ""}" data-scene-idx="${idx}">
         <div class="scene-card-top">
-          <span>${escapeHtml(s.archetypeBadge || "СЦЕНА 0" + (idx + 1))} · ${escapeHtml(layoutLabel)}${s.sourceBadge ? ` · ${escapeHtml(s.sourceBadge)}` : ""}</span>
-          <span>✓ ${s.finalCps} симв/с · ${Math.round(s.durationSec || 12)} с</span>
+          <span>${escapeHtml(s.archetypeBadge || `${uiL.scenePrefix} 0${idx + 1}`)} · ${escapeHtml(layoutLabel)}${s.sourceBadge ? ` · ${escapeHtml(s.sourceBadge)}` : ""}</span>
+          <span>✓ ${s.finalCps} ${uiL.cpsUnit} · ${Math.round(s.durationSec || 12)} ${uiL.secUnit}</span>
         </div>
         <div class="scene-card-title">${escapeHtml(s.title)}</div>
         <div class="scene-card-caption">${escapeHtml(s.caption)}</div>
@@ -1778,7 +1936,7 @@
                   .slice(0, 3)
                   .map(
                     (b, bIdx) =>
-                      `<button type="button" class="beat-jump-chip" data-jump-scene="${idx}" data-jump-beat="${bIdx}" title="${escapeHtml(b.text)}">▶ Бит ${bIdx + 1}</button>`
+                      `<button type="button" class="beat-jump-chip" data-jump-scene="${idx}" data-jump-beat="${bIdx}" title="${escapeHtml(b.text)}">▶ ${uiL.beatWord} ${bIdx + 1}</button>`
                   )
                   .join("")}
                </div>`
@@ -1810,6 +1968,7 @@
 
   // 8. Однопроходная безопасная подсветка терминов (с поддержкой казахского алфавита) + Дактиль КЖЯ/РЖЯ + Личные заметки
   function renderNotesAndGlossary(res) {
+    const uiL = getResultUiLabels(res.outputLang);
     const notesEl = document.getElementById("notesContent");
     const glossaryEl = document.getElementById("glossaryCardsContainer");
 
@@ -1839,7 +1998,7 @@
         const found = termEntries.find((t) => wordLower.startsWith(t.base.toLowerCase()));
         out += escapeHtml(raw.slice(lastIdx, idx));
         if (found) {
-          out += `<span class="term-highlight" data-term-id="${escapeHtml(found.id)}" title="Открыть карточку термина">${escapeHtml(word)}</span>`;
+          out += `<span class="term-highlight" data-term-id="${escapeHtml(found.id)}" title="${escapeHtml(uiL.openTermCard)}">${escapeHtml(word)}</span>`;
         } else {
           out += escapeHtml(word);
         }
@@ -1861,8 +2020,8 @@
         <div class="note-block-header">
           <h3>${escapeHtml(sec.title)}</h3>
           <div class="note-header-badges">
-            <button type="button" class="btn-jump-scene no-print" data-goto-scene="${sceneIdx}" title="Открыть эту тему в видео">
-              Сцена ${sceneIdx + 1}
+            <button type="button" class="btn-jump-scene no-print" data-goto-scene="${sceneIdx}" title="${escapeHtml(uiL.openInVideo)}">
+              ${uiL.scenePrefix} ${sceneIdx + 1}
             </button>
           </div>
         </div>
@@ -1873,10 +2032,10 @@
                  ${
                    sec.plainBlocks
                      ? `<div class="note-core-idea">
-                          <span class="note-card-kicker">Главная мысль</span>
+                          <span class="note-card-kicker">${escapeHtml(uiL.coreIdea)}</span>
                           <div>${highlightTermsInText(sec.plainBlocks.coreIdea)}</div>
                         </div>
-                        ${sec.plainBlocks.analogy ? `<div class="note-analogy-box"><span class="note-card-kicker">Пример из жизни</span><div>${highlightTermsInText(sec.plainBlocks.analogy)}</div></div>` : ""}
+                        ${sec.plainBlocks.analogy ? `<div class="note-analogy-box"><span class="note-card-kicker">${escapeHtml(uiL.analogy)}</span><div>${highlightTermsInText(sec.plainBlocks.analogy)}</div></div>` : ""}
                         ${
                           Array.isArray(sec.plainBlocks.termBreakdown) && sec.plainBlocks.termBreakdown.length
                             ? `<div class="note-terms-row">${sec.plainBlocks.termBreakdown
@@ -1886,14 +2045,14 @@
                         }
                         ${
                           Array.isArray(sec.plainBullets) && sec.plainBullets.length
-                            ? `<div class="note-takeaways-wrap"><span class="note-card-kicker">Что запомнить</span><ul class="note-bullets-list">${sec.plainBullets.map((b) => `<li>${highlightTermsInText(b)}</li>`).join("")}</ul></div>`
+                            ? `<div class="note-takeaways-wrap"><span class="note-card-kicker">${escapeHtml(uiL.takeaways)}</span><ul class="note-bullets-list">${sec.plainBullets.map((b) => `<li>${highlightTermsInText(b)}</li>`).join("")}</ul></div>`
                             : ""
                         }`
                      : `<div class="note-core-idea">${highlightTermsInText(sec.plainSummary)}</div>`
                  }
                </div>`
         }
-        <input type="text" class="personal-note-input no-print" data-note-key="${escapeHtml(noteKey)}" value="${escapeHtml(savedNote)}" placeholder="Ваша личная заметка к этому разделу..." />
+        <input type="text" class="personal-note-input no-print" data-note-key="${escapeHtml(noteKey)}" value="${escapeHtml(savedNote)}" placeholder="${escapeHtml(uiL.notePlaceholder)}" />
       </article>`;
       })
       .join("");
@@ -1918,7 +2077,7 @@
           </div>`
           )
           .join("")
-      : `<div style="padding:12px;font-size:0.86rem;color:var(--text-muted);">По запросу «${escapeHtml(state.glossaryQuery)}» терминов не найдено.</div>`;
+      : `<div style="padding:12px;font-size:0.86rem;color:var(--text-muted);">${escapeHtml(uiL.noTermsFound(state.glossaryQuery))}</div>`;
 
     renderFlashcardsWidget(res);
 
@@ -1946,6 +2105,7 @@
   }
 
   function renderFlashcardsWidget(res) {
+    const uiL = getResultUiLabels(res?.outputLang);
     const fcStage = document.getElementById("flashcardStage");
     const listContainer = document.getElementById("glossaryCardsContainer");
     const btnFc = document.getElementById("btnToggleFlashcards");
@@ -1953,7 +2113,7 @@
 
     fcStage.classList.toggle("hidden", !state.flashcardsOpen);
     if (listContainer) listContainer.classList.toggle("hidden", state.flashcardsOpen);
-    if (btnFc) btnFc.textContent = state.flashcardsOpen ? "📋 Список словаря" : "🃏 Карточки";
+    if (btnFc) btnFc.textContent = state.flashcardsOpen ? uiL.fcList : uiL.fcCards;
     if (!state.flashcardsOpen) return;
 
     const total = res.glossary.length;
@@ -1962,20 +2122,20 @@
     const flipped = state.flashcardFlipped;
 
     fcStage.innerHTML = `
-      <div class="flashcard-face" id="flashcardInteractiveFace" title="Нажмите, чтобы перевернуть карточку">
-        <span class="step-badge">${flipped ? "✨ ОТВЕТ НА ЯСНОМ ЯЗЫКЕ" : `КАРТОЧКА ${idx + 1} ИЗ ${total} · НАЖМИТЕ ДЛЯ ОТВЕТА`}</span>
+      <div class="flashcard-face" id="flashcardInteractiveFace" title="${escapeHtml(uiL.fcShow)}">
+        <span class="step-badge">${flipped ? uiL.fcAnswer : uiL.fcCardOf(idx + 1, total)}</span>
         ${
           flipped
             ? `<div style="font-weight:700;font-size:0.98rem;color:var(--text);margin-top:6px;">${escapeHtml(card.plain)}</div>
                <div style="font-size:0.84rem;color:var(--text-muted);margin-top:6px;">${escapeHtml(card.academic || "")}</div>`
             : `<div style="font-family:var(--font-display);font-weight:800;font-size:1.16rem;color:var(--primary);margin-top:8px;">${escapeHtml(card.term)}</div>
-               <div style="font-size:0.82rem;color:var(--text-muted);">Попробуйте вспомнить смысл своими словами, затем нажмите на карточку</div>`
+               <div style="font-size:0.82rem;color:var(--text-muted);">${escapeHtml(uiL.fcPrompt)}</div>`
         }
       </div>
       <div class="flashcard-controls">
-        <button type="button" class="btn-outline-sm" id="btnFcPrev">← Пред.</button>
-        <button type="button" class="btn-primary-sm" id="btnFcFlip">${flipped ? "Скрыть ответ" : "Показать ответ"}</button>
-        <button type="button" class="btn-outline-sm" id="btnFcNext">След. →</button>
+        <button type="button" class="btn-outline-sm" id="btnFcPrev">${escapeHtml(uiL.fcPrev)}</button>
+        <button type="button" class="btn-primary-sm" id="btnFcFlip">${escapeHtml(flipped ? uiL.fcHide : uiL.fcShow)}</button>
+        <button type="button" class="btn-outline-sm" id="btnFcNext">${escapeHtml(uiL.fcNext)}</button>
       </div>`;
 
     const toggleFlip = () => {
@@ -2025,6 +2185,7 @@
 
   // 9. Настоящая двухуровневая Интеллект-карта (Тема -> Разделы -> Термины) без наложений, с Pan & Zoom и переходом к сцене видео
   function renderTwoLevelMindMapSVG(res) {
+    const uiL = getResultUiLabels(res.outputLang);
     const container = document.getElementById("mindmapContainer");
     const detailBox = document.getElementById("mindmapNodeDetail");
     const centerTitle = res.courseTitle.split("·").pop().trim();
@@ -2112,10 +2273,10 @@
 
     interactiveRecords.push({
       kind: "root",
-      badge: "ГЛАВНАЯ ТЕМА КУРСА",
+      badge: uiL.mmRootBadge,
       title: centerTitle,
-      plain: res.sections?.[0]?.plainBlocks?.coreIdea || "Обзор всех разделов и ключевых терминов лекции.",
-      extra: `Разделов: ${sections.length} · Терминов: ${terms.length}`,
+      plain: res.sections?.[0]?.plainBlocks?.coreIdea || uiL.mmRootPlain,
+      extra: uiL.mmRootExtra(sections.length, terms.length),
       sceneIndex: 0
     });
 
@@ -2145,7 +2306,7 @@
         const secRecIdx = interactiveRecords.length;
         interactiveRecords.push({
           kind: "section",
-          badge: br.sec.sourceBadge || `РАЗДЕЛ 0${br.sIdx + 1}`,
+          badge: br.sec.sourceBadge || `${uiL.mmSecWord} 0${br.sIdx + 1}`,
           title: br.sec.title,
           plain: br.sec.plainBlocks?.coreIdea || br.sec.plainSummary,
           extra: br.sec.plainBlocks?.analogy || "",
@@ -2159,7 +2320,7 @@
         nodesXml += `
           <g class="mm-node" data-mm-rec="${secRecIdx}" style="cursor:pointer;">
             <rect class="mm-card" x="${sx - secW / 2}" y="${sy - secH / 2}" width="${secW}" height="${secH}" rx="14" ry="14" fill="url(#${gradId})" stroke="${pal.stroke}" stroke-width="1.8" filter="url(#mmShadow)" />
-            <text x="${sx}" y="${sy - secH / 2 + 14}" text-anchor="middle" fill="${pal.stroke}" font-family="JetBrains Mono, monospace" font-size="9.5" font-weight="800">${escapeHtml(br.sec.sourceBadge || `РАЗДЕЛ ${br.sIdx + 1}`)}</text>
+            <text x="${sx}" y="${sy - secH / 2 + 14}" text-anchor="middle" fill="${pal.stroke}" font-family="JetBrains Mono, monospace" font-size="9.5" font-weight="800">${escapeHtml(br.sec.sourceBadge || `${uiL.mmSecWord} ${br.sIdx + 1}`)}</text>
             <text text-anchor="middle" fill="${pal.text}" font-family="Manrope, Inter, sans-serif" font-size="12.5" font-weight="700">${sTitleTspans}</text>
           </g>`;
 
@@ -2184,7 +2345,7 @@
           const termRecIdx = interactiveRecords.length;
           interactiveRecords.push({
             kind: "term",
-            badge: `ТЕРМИН · ${br.sec.sourceBadge || "СИЛЛАБУС"}`,
+            badge: uiL.mmTermBadge(br.sec.sourceBadge),
             title: termObj.term,
             plain: termObj.plain,
             dactyl: termObj.dactylBoxes,
@@ -2262,11 +2423,11 @@
       detailBox.innerHTML = `
         <span class="step-badge">${escapeHtml(rec.badge)}</span>
         <h4 style="font-size:1.1rem;margin:8px 0 10px;">${escapeHtml(rec.title)}</h4>
-        <p style="margin-bottom:10px;font-size:0.94rem;line-height:1.6;"><strong>Простыми словами:</strong> ${escapeHtml(rec.plain)}</p>
-        ${rec.extra ? `<p style="font-size:0.88rem;color:var(--text-secondary);margin-bottom:10px;"><strong>Пример:</strong> ${escapeHtml(rec.extra)}</p>` : ""}
-        ${rec.academic ? `<p style="font-size:0.88rem;color:var(--text-secondary);margin-bottom:12px;"><strong>Для экзамена:</strong> ${escapeHtml(rec.academic)}</p>` : ""}
+        <p style="margin-bottom:10px;font-size:0.94rem;line-height:1.6;"><strong>${escapeHtml(uiL.mmPlainLabel)}</strong> ${escapeHtml(rec.plain)}</p>
+        ${rec.extra ? `<p style="font-size:0.88rem;color:var(--text-secondary);margin-bottom:10px;"><strong>${escapeHtml(uiL.mmExampleLabel)}</strong> ${escapeHtml(rec.extra)}</p>` : ""}
+        ${rec.academic ? `<p style="font-size:0.88rem;color:var(--text-secondary);margin-bottom:12px;"><strong>${escapeHtml(uiL.mmExamLabel)}</strong> ${escapeHtml(rec.academic)}</p>` : ""}
         <button type="button" class="btn-primary-sm no-print" id="btnMmGotoScene" data-scene="${rec.sceneIndex || 0}">
-          Показать в видео (Сцена ${(rec.sceneIndex || 0) + 1})
+          ${escapeHtml(uiL.mmGotoScene((rec.sceneIndex || 0) + 1))}
         </button>`;
       document.getElementById("btnMmGotoScene")?.addEventListener("click", (ev) => {
         jumpToVideoScene(parseInt(ev.currentTarget.getAttribute("data-scene"), 10) || 0, 0);
@@ -2365,6 +2526,7 @@
 
   // 10. Полноценный адаптивный тест (количество вопросов зависит от объёма лекции) + перегенерация
   function renderQuiz(quiz) {
+    const uiL = getResultUiLabels(state.pipelineResult?.outputLang);
     const listEl = document.getElementById("quizList");
     const count = Array.isArray(quiz) ? quiz.length : 0;
     const countBadge = document.getElementById("quizCountBadge");
@@ -2372,7 +2534,7 @@
 
     const btnFull = document.getElementById("btnQuizModeFull");
     if (btnFull) {
-      btnFull.textContent = `Полный тест (${count})`;
+      btnFull.textContent = uiL.quizFull(count);
       btnFull.classList.add("active");
     }
 
@@ -2384,7 +2546,7 @@
     }
     const scoreBox = document.getElementById("quizScoreBox");
     if (scoreBox) {
-      scoreBox.textContent = `Ответьте на ${count} вопр. и нажмите «Проверить ответы»`;
+      scoreBox.textContent = uiL.quizPrompt(count);
       scoreBox.style.borderColor = "";
       scoreBox.style.color = "";
       scoreBox.style.background = "";
@@ -2398,9 +2560,9 @@
           <div class="quiz-q-title">${q.number}. ${escapeHtml(q.question)}</div>
           <div class="quiz-q-actions">
             <span class="quiz-status-pill hidden" id="quiz_status_${qIdx}"></span>
-            ${q.sourceBadge ? `<span class="source-cite-badge">📌 ${escapeHtml(q.sourceBadge)}</span>` : ""}
+            ${q.sourceBadge ? `<span class="source-cite-badge">${escapeHtml(q.sourceBadge)}</span>` : ""}
             ${q.angleLabel ? `<span class="note-section-tag">${escapeHtml(q.angleLabel)}</span>` : ""}
-            ${q.hint ? `<button type="button" class="btn-quiz-hint no-print" data-hint-q="${qIdx}">Подсказка</button>` : ""}
+            ${q.hint ? `<button type="button" class="btn-quiz-hint no-print" data-hint-q="${qIdx}">${escapeHtml(uiL.quizHintBtn)}</button>` : ""}
           </div>
         </div>
         ${q.hint ? `<div class="quiz-hint-box hidden no-print" id="quiz_hint_${qIdx}">${escapeHtml(q.hint)}</div>` : ""}
@@ -2410,7 +2572,7 @@
               (opt, oIdx) => `
             <label class="quiz-option" data-q="${qIdx}" data-o="${oIdx}">
               <input type="radio" name="quiz_q_${qIdx}" value="${oIdx}" />
-              <span class="quiz-opt-letter">${["А", "Б", "В", "Г"][oIdx] || oIdx + 1}</span>
+              <span class="quiz-opt-letter">${uiL.quizLetters[oIdx] || oIdx + 1}</span>
               <span class="quiz-opt-main">${escapeHtml(opt)}</span>
               <span class="quiz-opt-tag"></span>
             </label>`
@@ -2422,7 +2584,7 @@
           <div>${escapeHtml(q.explanation)}</div>
           ${
             typeof q.linkedSceneIndex === "number"
-              ? `<button type="button" class="btn-jump-scene mt-6 no-print" data-quiz-goto-scene="${q.linkedSceneIndex}">Повторить в Сцене ${q.linkedSceneIndex + 1}</button>`
+              ? `<button type="button" class="btn-jump-scene mt-6 no-print" data-quiz-goto-scene="${q.linkedSceneIndex}">${escapeHtml(uiL.quizRepeatScene(q.linkedSceneIndex + 1))}</button>`
               : ""
           }
         </div>
@@ -2537,6 +2699,7 @@
 
     document.getElementById("btnCheckQuiz").addEventListener("click", () => {
       if (!state.pipelineResult) return;
+      const uiL = getResultUiLabels(state.pipelineResult.outputLang);
       let correctCount = 0;
       let wrongCount = 0;
       let skippedCount = 0;
@@ -2565,13 +2728,13 @@
         if (statusEl) {
           statusEl.classList.remove("hidden", "is-correct", "is-wrong", "is-skipped");
           if (isCorrect) {
-            statusEl.textContent = "✓ Верно";
+            statusEl.textContent = uiL.quizCorrect;
             statusEl.classList.add("is-correct");
           } else if (isSkipped) {
-            statusEl.textContent = "⚠ Без ответа";
+            statusEl.textContent = uiL.quizSkipped;
             statusEl.classList.add("is-skipped");
           } else {
-            statusEl.textContent = "✕ Ошибка";
+            statusEl.textContent = uiL.quizWrong;
             statusEl.classList.add("is-wrong");
           }
         }
@@ -2587,10 +2750,10 @@
 
           if (oIdx === q.correctIndex) {
             optEl.classList.add("correct");
-            if (tagEl) tagEl.textContent = oIdx === chosenIdx ? "✓ Ваш выбор · Верно" : "✓ Верный ответ";
+            if (tagEl) tagEl.textContent = oIdx === chosenIdx ? uiL.quizYourRight : uiL.quizRight;
           } else if (oIdx === chosenIdx) {
             optEl.classList.add("wrong");
-            if (tagEl) tagEl.textContent = "✕ Ваш выбор";
+            if (tagEl) tagEl.textContent = uiL.quizYourWrong;
           } else {
             optEl.classList.add("dimmed");
           }
@@ -2602,10 +2765,10 @@
             diffEl.textContent = "";
           } else {
             const correctTxt = q.options?.[q.correctIndex] || "";
-            const chosenTxt = isSkipped ? "ответ не выбран" : `«${q.options?.[chosenIdx] || ""}»`;
+            const chosenTxt = `«${q.options?.[chosenIdx] || ""}»`;
             diffEl.textContent = isSkipped
-              ? `⚠ Вы пропустили вопрос. Верный ответ: «${correctTxt}»`
-              : `✕ Вы выбрали: ${chosenTxt} → Верный ответ: «${correctTxt}»`;
+              ? uiL.quizDiffSkipped(correctTxt)
+              : uiL.quizDiffWrong(chosenTxt, correctTxt);
             diffEl.classList.remove("hidden");
           }
         }
@@ -2616,9 +2779,9 @@
       const pct = Math.round((correctCount / totalQ) * 100);
       const scoreBox = document.getElementById("quizScoreBox");
       if (scoreBox) {
-        const parts = [`Верно: ${correctCount} из ${totalQ} (${pct}%)`];
-        if (wrongCount > 0) parts.push(`Ошибок: ${wrongCount}`);
-        if (skippedCount > 0) parts.push(`Пропущено: ${skippedCount}`);
+        const parts = [uiL.quizScore(correctCount, totalQ, pct)];
+        if (wrongCount > 0) parts.push(uiL.quizErrors(wrongCount));
+        if (skippedCount > 0) parts.push(uiL.quizSkippedCount(skippedCount));
         scoreBox.textContent = parts.join(" · ");
         if (wrongCount === 0 && skippedCount === 0) {
           scoreBox.style.borderColor = "var(--success)";
@@ -2635,7 +2798,7 @@
       const btnFilterErr = document.getElementById("btnQuizFilterErrors");
       if (btnFilterErr) {
         if (issuesCount > 0) {
-          btnFilterErr.textContent = `🔍 Только ошибки (${issuesCount})`;
+          btnFilterErr.textContent = uiL.quizFilterErrors(issuesCount);
           btnFilterErr.classList.remove("hidden", "active");
           state.quizErrorsOnly = false;
         } else {
@@ -2997,7 +3160,7 @@
       if (info.index !== lastUiSceneIdx) {
         lastUiSceneIdx = info.index;
         document.getElementById("sceneCounterLabel").textContent =
-          `Сцена ${info.index + 1} из ${state.animEngine.scenes.length || 1}`;
+          getResultUiLabels(state.pipelineResult?.outputLang).sceneOf(info.index + 1, state.animEngine.scenes.length || 1);
         let activeCard = null;
         document.querySelectorAll(".scene-card").forEach((c, idx) => {
           const isAct = idx === info.index;
